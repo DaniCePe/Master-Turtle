@@ -1,0 +1,48 @@
+version = 20261012.1200
+-- Unified turn program for the l/r shims.
+-- Shims call: shell.run("turn", "<side>", ...)
+-- side is "left" or "right".
+local usage = {}
+usage.left = [[l = 1 turn to left
+l # : turns # times to left]]
+usage.right = [[r = 1 turn to right
+r # : turns # times to right]]
+args = {...}
+local side = args[1]
+table.remove(args, 1)
+if side ~= "left" and side ~= "right" then
+	print("turn: unknown side '"..tostring(side).."'")
+	return
+end
+local turnFn = (side == "left") and turtle.turnLeft or turtle.turnRight
+local sideName = (side == "left") and "Left" or "Right"
+
+function main()
+	local numTurns = 0
+
+	if args[1] ~= nil then
+		if args[1]:lower() == "h" then
+			term.clear()
+			term.setCursorPos(1,1)
+			print(usage[side])
+			print("Fuel Level: "..turtle.getFuelLevel())
+			error()
+		else
+			numTurns = tonumber(args[1])
+			if numTurns == nil then
+				print("Use a number as argument, not "..args[1])
+				error()
+			end
+			for i = 1, numTurns do
+				turnFn()
+			end
+		end
+	else
+		turnFn()
+		numTurns = 1
+	end
+
+	print("Turned "..sideName.." "..numTurns.." times. Fuel: "..turtle.getFuelLevel())
+end
+
+main()
