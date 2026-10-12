@@ -1,0 +1,142 @@
+-------------------------------------
+-- YES/NO DICTIONARIES
+-------------------------------------
+local yesList = {
+    yes = true, y = true, yey = true,
+    sure = true, ["of course"] = true,
+    indeed = true,
+}
+
+local noList = {
+    no = true, n = true, nay = true,
+    nope = true, ["of course not"] = true,
+    ["not really"] = true,
+}
+
+local stopFlag = false
+
+-------------------------------------
+-- UI HELPERS
+-------------------------------------
+local function header(title)
+    term.clear()
+    term.setCursorPos(1,1)
+    term.setTextColor(colors.blue)
+    print("================================")
+    print(" "..title)
+    print("================================")
+    term.setTextColor(colors.white)
+end
+
+local function info(msg)
+    term.setTextColor(colors.orange)
+    print(msg)
+    term.setTextColor(colors.white)
+end
+
+local function errorMsg(msg)
+    term.setTextColor(colors.red)
+    print(msg)
+    term.setTextColor(colors.white)
+end
+
+local function formatTime(seconds)
+    local m = math.floor(seconds / 60)
+    local s = math.floor(seconds % 60)
+    return string.format("%02d:%02d", m, s)
+end
+
+-------------------------------------
+-- INPUT VALIDATION
+-------------------------------------
+header("SHOULD I CRANK IT???")
+info("TELL ME")
+
+local ans = (read() or ""):lower()
+
+while not yesList[ans] and not noList[ans] do
+    errorMsg("wym. it's a yey or nay question.")
+    ans = (read() or ""):lower()
+end
+
+-- NO path -> instant exit
+if noList[ans] then
+    header("ABORT")
+    errorMsg("then why tf u callin??")
+    return
+end
+
+-------------------------------------
+-- BLOCK CHECK
+-------------------------------------
+header("BLOCK SCAN")
+sleep(1)
+local ok, data = turtle.inspect()
+local blockName = ""
+
+if ok and data.name then
+    blockName = data.name:lower()
+end
+
+if not ok or not blockName:find("crank") then
+    errorMsg("Nothin to crank mate. Call me later.")
+    return
+end
+sleep(1)
+info("Target acquired.")
+sleep(1)
+-------------------------------------
+-- CRANK LOOP
+-------------------------------------
+local function crankLoop()
+    header("CCCCRANKINGG")
+    info("IM CRANKING IT")
+
+    term.setTextColor(colors.blue)
+    print("Press ENTER to stop.")
+    print("Cranked it for: 00:00")
+    print("--------------------------------")
+
+    local startTime = os.clock()
+
+    -- capture Y position of the timer line (the second line we just printed)
+    local _, timerY = term.getCursorPos()
+    timerY = timerY - 2
+
+    while not stopFlag do
+        turtle.place()
+        sleep(0.05)
+
+        local elapsed = os.clock() - startTime
+        term.setCursorPos(1, timerY)
+        term.clearLine()
+        term.write("Cranked it for: " .. formatTime(elapsed))
+    end
+end
+
+
+
+-------------------------------------
+-- KEY LISTENER
+-------------------------------------
+local function stopListener()
+    while true do
+        local event, key = os.pullEvent("key")
+        if key == keys.enter then
+            stopFlag = true
+            term.setTextColor(colors.green)
+            return
+        end
+    end
+end
+
+-------------------------------------
+-- START BOTH
+-------------------------------------
+parallel.waitForAny(crankLoop, stopListener)
+
+term.setTextColor(colors.green)
+print("\nAlright fine. Stopping the crank...")
+sleep(3)
+print("\nBUT BECAUSE I WAS DONE XD")
+term.setTextColor(colors.white)
