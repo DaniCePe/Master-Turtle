@@ -1,0 +1,86 @@
+version = 20261012.1200
+-- Universal Liquid Refuel
+-- Version 2.2 
+-- UI upgraded
+-- Compatibility with any liquid.
+
+local fuelLimit = turtle.getFuelLimit()
+local targetFuel = fuelLimit
+
+-- Find an item slot by a predicate function
+local function findItemBy(fn)
+    for slot = 1, 16 do
+        local item = turtle.getItemDetail(slot)
+        if item and fn(item, slot) then
+            return slot
+        end
+    end
+    return nil
+end
+
+-- Detect any filled bucket (lava, creosote, ethanol, etc.)
+local function isFilledBucket(item)
+    return item.name:match("bucket") and not item.name:match("minecraft:bucket$")
+end
+
+-- Draw a simple UI
+local function drawUI(currentFuel, targetFuel)
+    term.clear()
+    term.setCursorPos(1,1)
+    print("==============================")
+    print("=   Universal Liquid Refuel  =")
+    print("==============================")
+    print("Fuel Level: "..currentFuel.." / "..targetFuel)
+    local percent = math.floor((currentFuel/targetFuel)*100)
+    io.write("Progress: [")
+    local bars = math.floor(percent/5)
+    for i=1,20 do
+        if i <= bars then io.write("=") else io.write(" ") end
+    end
+    print("] "..percent.."%")
+    print("==============================")
+end
+
+-- Main loop
+while turtle.getFuelLevel() < targetFuel do
+    local didRefuel = false
+    drawUI(turtle.getFuelLevel(), targetFuel)
+
+    -- 1. Use any burnable filled bucket
+    local fullBucket = findItemBy(isFilledBucket)
+    if fullBucket then
+        turtle.select(fullBucket)
+        if turtle.refuel(0) then  -- check if burnable
+            turtle.refuel()
+            print("Refueled using bucket in slot "..fullBucket.."! Fuel: "..turtle.getFuelLevel().." / "..targetFuel)
+            didRefuel = true
+        else
+            print("Found non-burnable bucket in slot "..fullBucket..". Ignoring.")
+        end
+    end
+
+    -- 2. Collect new fluid if needed
+    if not didRefuel then
+        local emptyBucket = findItemBy(function(item)
+            return item.name == "minecraft:bucket"
+        end)
+
+        if emptyBucket then
+            turtle.select(emptyBucket)
+            if turtle.placeDown() then
+                print("Collected new fluid into bucket from below.")
+                sleep(0.2)
+            else
+                print("No source block below to collect from. Waiting...")
+            end
+        else
+            print("No empty buckets available!")
+        end
+    end
+
+    sleep(0.5)
+end
+
+print("==============================")
+print("Refuel complete! Fuel is full at "..turtle.getFuelLevel().."/"..targetFuel)
+print("==============================")
