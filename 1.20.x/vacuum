@@ -1,0 +1,209 @@
+version = 20261012.1200
+-- VACUUM SWEEPER v1.0
+-- Snake sweeps L x W, sucks floor items, dumps into chest if found.
+-- Uses full tracked path + reverse replay (from AE2 Scanner v3.1)
+-- Returns to start & facing after each sweep. Runs until ENTER.
+
+--------------------------------------
+-- UTIL / UI
+--------------------------------------
+local function colorPrint(msg, color)
+    term.setTextColor(color)
+    print(msg)
+    term.setTextColor(colors.white)
+end
+
+local function readNum(prompt)
+    colorPrint(prompt, colors.orange)
+    local n = tonumber(read())
+    while not n or n <= 0 do
+        colorPrint("Enter a valid positive number:", colors.red)
+        n = tonumber(read())
+    end
+    return math.floor(n)
+end
+
+--------------------------------------
+-- TRACKED MOVEMENT SYSTEM
+--------------------------------------
+local x, z = 0, 0
+local dir = 0
+local path = {}
+
+local function turnRightTracked()
+    turtle.turnRight(); dir = (dir + 1) % 4
+end
+local function turnLeftTracked()
+    turtle.turnLeft(); dir = (dir + 3) % 4
+end
+
+local function forwardSafe()
+    while not turtle.forward() do
+        turtle.dig()
+        turtle.attack()
+        sleep(0.05)
+    end
+end
+
+local function forwardTracked()
+    forwardSafe()
+    if dir == 0 then z = z - 1; table.insert(path, {0,-1})
+    elseif dir == 1 then x = x + 1; table.insert(path, {1,0})
+    elseif dir == 2 then z = z + 1; table.insert(path, {0,1})
+    elseif dir == 3 then x = x - 1; table.insert(path, {-1,0}) end
+end
+
+local function retracePath()
+    while #path > 0 do
+        local step = table.remove(path)
+        local dx, dz = step[1], step[2]
+
+        if dx == 1 then while dir ~= 3 do turnLeftTracked() end
+        elseif dx == -1 then while dir ~= 1 do turnLeftTracked() end
+        elseif dz == 1 then while dir ~= 0 do turnLeftTracked() end
+        elseif dz == -1 then while dir ~= 2 do turnLeftTracked() end
+        end
+
+        forwardSafe()
+        if dir == 0 then z = z - 1
+        elseif dir == 1 then x = x + 1
+        elseif dir == 2 then z = z + 1
+        elseif dir == 3 then x = x - 1 end
+    end
+end
+
+--------------------------------------
+-- ITEM VACUUMING & DUMPING
+--------------------------------------
+local function suckAll()
+    turtle.suck()
+    turtle.suckDown()
+end
+
+local function totalItems()
+    local t = 0
+    for s=1,16 do
+        local d = turtle.getItemDetail(s)
+        if d then t = t + d.count end
+    end
+    return t
+end
+
+local function isChest(name)
+    if not name then return false end
+    return string.find(name, "chest") or string.find(name, "barrel")
+end
+
+local function dumpAllDown()
+    for s=1,16 do
+        turtle.select(s)
+        turtle.dropDown()
+    end
+    turtle.select(1)
+end
+
+local function searchForChest(maxSteps)
+    local startDir = dir
+
+    for step = 1, maxSteps do
+        local exists, info = turtle.inspectDown()
+        if exists and isChest(info.name) then
+            return true, startDir
+        end
+        forwardTracked()
+    end
+
+    retracePath()
+    while dir ~= startDir do turnLeftTracked() end
+    return false, startDir
+end
+
+--------------------------------------
+-- SWEEP LOGIC
+--------------------------------------
+local function sweep(length, width)
+    local forwardRow = true
+
+    for row = 1, width do
+        for col = 1, length do
+            suckAll()
+
+            if totalItems() >= 256 then
+                colorPrint("Inventory >= 256: searching for chest...", colors.red)
+                local found, sd = searchForChest(length)
+                if found then
+                    colorPrint("Chest found! Dumping...", colors.green)
+                    dumpAllDown()
+                    retracePath()
+                    while dir ~= sd do turnLeftTracked() end
+                else
+                    colorPrint("No chest found.", colors.red)
+                end
+            end
+
+            if col < length then forwardTracked() end
+        end
+
+        if row < width then
+            if forwardRow then
+                turnRightTracked(); forwardTracked(); turnRightTracked()
+            else
+                turnLeftTracked(); forwardTracked(); turnLeftTracked()
+            end
+            forwardRow = not forwardRow
+        end
+    end
+end
+
+--------------------------------------
+-- RETURN
+--------------------------------------
+local function returnHome(startDir)
+    retracePath()
+    while dir ~= startDir do turnLeftTracked() end
+    x, z = 0, 0
+end
+
+--------------------------------------
+-- MAIN
+--------------------------------------
+term.clear(); term.setCursorPos(1,1)
+colorPrint("=== VACUUM SWEEPER v1.0 ===", colors.blue)
+
+local tArgs = { ... }
+local cliL, cliW = 0, 0
+for i = 1, #tArgs, 2 do
+    if tArgs[i] == "-length" then cliL = math.floor(tonumber(tArgs[i + 1]) or 0)
+    elseif tArgs[i] == "-width" then cliW = math.floor(tonumber(tArgs[i + 1]) or 0)
+    end
+end
+local L = cliL > 0 and cliL or readNum("Enter area LENGTH:")
+local W = cliW > 0 and cliW or readNum("Enter area WIDTH:")
+
+colorPrint("Press ENTER to start. Press ENTER again to stop.", colors.green)
+read()
+
+local stop = false
+local function watch()
+    while true do
+        local e,k = os.pullEvent("key")
+        if k == keys.enter then stop = true return end
+    end
+end
+
+local startDir = dir
+
+local function run()
+    while not stop do
+        path = {}
+        x, z = 0,0
+        dir = startDir
+        sweep(L, W)
+        returnHome(startDir)
+    end
+end
+
+parallel.waitForAny(run, watch)
+
+term.clear(); term.setCursorPos(1,1)
+colorPrint("Vacuum stopped. Goodbye.", colors.blue)
