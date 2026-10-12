@@ -1,0 +1,225 @@
+version = 20261012.1200
+-- Attacker v2.1 (CC:Tweaked)
+-- Features:
+--  * Continuous attacks forward
+--  * Adjustable delay between attacks
+--  * Auto-select weapon (prefers swords)
+--  * Auto-refuel from inventory
+--  * Auto-dump items to chests if 6+ slots are filled
+--  * UI with attack/hit counters
+--  * Stop by pressing ENTER
+
+local stopFlag = false
+local attacksPerformed, hitsRegistered = 0, 0
+
+--------------------------------------
+-- COLORS / UI HELPERS
+--------------------------------------
+local function colorPrint(message, color)
+    term.setTextColor(color)
+    print(message)
+    term.setTextColor(colors.white)
+end
+
+local function colorWrite(message, color)
+    term.setTextColor(color)
+    io.write(message)
+    term.setTextColor(colors.white)
+end
+
+--------------------------------------
+-- INPUT PROMPT
+--------------------------------------
+local function readNumber(prompt, default)
+    while true do
+        term.clear()
+        term.setCursorPos(1,1)
+        colorPrint(prompt, colors.orange)
+        if default then
+            io.write("(ENTER for "..tostring(default).."): ")
+        end
+        local s = read()
+        if s == "" and default then return default end
+        local n = tonumber(s)
+        if n and n >= 0 then return n end
+        colorPrint("Enter a valid number >= 0", colors.red)
+        sleep(0.5)
+    end
+end
+
+--------------------------------------
+-- WEAPON & REFUEL
+--------------------------------------
+local function selectWeapon()
+    local swordKeywords = {"sword", "katana"}
+    for slot=1,16 do
+        local d = turtle.getItemDetail(slot)
+        if d and d.name then
+            local nm = d.name:lower()
+            for _,k in ipairs(swordKeywords) do
+                if nm:find(k) then turtle.select(slot) return true end
+            end
+        end
+    end
+    for slot=1,16 do
+        if turtle.getItemCount(slot) > 0 then turtle.select(slot) return true end
+    end
+    return true
+end
+
+local function tryRefuelIfNeeded()
+    local fuel = turtle.getFuelLevel()
+    if type(fuel) ~= "number" or fuel > 100 then return true end
+
+    local fuelNames = {
+        ["minecraft:coal"]=true, ["minecraft:charcoal"]=true,
+        ["minecraft:coal_block"]=true, ["minecraft:lava_bucket"]=true
+    }
+    for slot=1,16 do
+        local d = turtle.getItemDetail(slot)
+        if d and d.name and fuelNames[d.name] then
+            turtle.select(slot)
+            if turtle.refuel(1) then return true end
+        end
+    end
+    return false
+end
+
+--------------------------------------
+-- INVENTORY MANAGEMENT
+--------------------------------------
+local function occupiedSlots()
+    local count = 0
+    for i=1,16 do
+        if turtle.getItemCount(i) > 0 then count = count + 1 end
+    end
+    return count
+end
+
+local function tryDump(inspectFunc, dropFunc)
+    local ok, data = inspectFunc()
+    if ok and data.name and string.find(data.name, "chest") then
+        local dumpedSomething = false
+        for i=1,16 do
+            if turtle.getItemCount(i) > 0 then
+                turtle.select(i)
+                local before = turtle.getItemCount(i)
+                dropFunc()
+                local after = turtle.getItemCount(i)
+                if after < before then dumpedSomething = true end
+            end
+        end
+        turtle.select(1)
+        return dumpedSomething
+    end
+    return false
+end
+
+local function dumpToChest()
+    if tryDump(turtle.inspect, turtle.drop) then return true end
+    if tryDump(turtle.inspectUp, turtle.dropUp) then return true end
+    if tryDump(turtle.inspectDown, turtle.dropDown) then return true end
+    turtle.turnLeft()
+    if tryDump(turtle.inspect, turtle.drop) then turtle.turnRight() return true end
+    turtle.turnRight(); turtle.turnRight()
+    if tryDump(turtle.inspect, turtle.drop) then turtle.turnLeft() return true end
+    turtle.turnLeft()
+    return false
+end
+
+--------------------------------------
+-- UI
+--------------------------------------
+local function drawUI(delay)
+    term.clear()
+    term.setCursorPos(1,1)
+    colorPrint("=== Attacker v2.1 ===", colors.blue)
+    print(string.rep("=",30))
+    colorWrite("Mode: ", colors.green); colorPrint("continuous", colors.orange)
+    colorWrite("Direction: ", colors.green); colorPrint("front", colors.orange)
+    colorWrite("Delay: ", colors.green); colorPrint(delay.."s", colors.orange)
+    print("---------------------------")
+    colorWrite("Attacks performed: ", colors.green); colorPrint(attacksPerformed, colors.orange)
+    colorWrite("Hits registered  : ", colors.green); colorPrint(hitsRegistered, colors.orange)
+    local percent = attacksPerformed > 0 and math.min(100, (hitsRegistered/attacksPerformed)*100) or 0
+    io.write("Hit ratio: [")
+    local bars = math.floor(percent/5)
+    for i=1,20 do
+        if i <= bars then colorWrite("=", colors.blue) else io.write(" ") end
+    end
+    colorPrint("] "..math.floor(percent).."%", colors.orange)
+    print("---------------------------")
+    colorWrite("Inventory slots used: ", colors.green)
+    colorPrint(occupiedSlots().."/16", colors.orange)
+    print("")
+    colorPrint("Press ENTER to stop.", colors.red)
+end
+
+--------------------------------------
+-- ATTACK
+--------------------------------------
+local function doAttackOnce()
+    if turtle.attack() then
+        hitsRegistered = hitsRegistered + 1
+    end
+    attacksPerformed = attacksPerformed + 1
+end
+
+--------------------------------------
+-- WORKER
+--------------------------------------
+local function continuousWorker(delay)
+    while not stopFlag do
+        if not tryRefuelIfNeeded() then
+            colorPrint("Low fuel, stopping.", colors.red)
+            stopFlag = true
+            return
+        end
+        if occupiedSlots() >= 6 then
+            colorPrint("Inventory busy, dumping items...", colors.orange)
+            local dumped = dumpToChest()
+            if not dumped then
+                colorPrint("No chest found. Stopping.", colors.red)
+                stopFlag = true
+                return
+            end
+        end
+        selectWeapon()
+        doAttackOnce()
+        drawUI(delay)
+        os.sleep(delay)
+    end
+end
+
+--------------------------------------
+-- STOP LISTENER
+--------------------------------------
+local function stopListener()
+    while true do
+        local ev,key = os.pullEvent("key")
+        if key==keys.enter then
+            stopFlag=true
+            colorPrint("\nUser requested stop.", colors.red)
+            return
+        end
+    end
+end
+
+--------------------------------------
+-- PROGRAM START
+--------------------------------------
+term.clear()
+term.setCursorPos(1,1)
+colorPrint("Welcome to Attacker v2.1!", colors.blue)
+colorPrint("==========================", colors.blue)
+local delay = readNumber("Delay between attacks (seconds, e.g. 0.1):", 0.1)
+colorPrint("Press ENTER to begin. (ENTER again during run to stop)", colors.green)
+read()
+
+parallel.waitForAny(function() continuousWorker(delay) end, stopListener)
+
+term.clear(); term.setCursorPos(1,1)
+colorPrint("Attacker stopped. Stats:", colors.blue)
+colorPrint("Attacks performed: "..attacksPerformed, colors.orange)
+colorPrint("Hits registered  : "..hitsRegistered, colors.orange)
+colorPrint("Goodbye.", colors.green)
