@@ -1,0 +1,275 @@
+version = 20261012.1200
+-- TRMP.lua v0.4 BETA
+	-- Added go up once so it can safely start on the ground level.
+-- TRMP.lua v0.3 BETA
+	-- Added MAX_CARRY safety check.
+	-- Fixed color scheme
+-- TRMP.lua v0.2 BETA
+	-- Layered snake-pattern wall construction
+	-- Uses allowedBlocks() library
+-- TRMP.lua v0.1 BETA
+	-- COLOR + UI + Progress Bar + Fuel + Countdown
+
+--------------------------------------
+-- CONSTANTS
+--------------------------------------
+local MAX_CARRY = 1024  -- 16 stacks × 64
+local refillMode = false
+
+--------------------------------------
+-- COLORS
+--------------------------------------
+local function colorPrint(message, color)
+    term.setTextColor(color)
+    print(message)
+    term.setTextColor(colors.white)
+end
+
+local function colorWrite(message, color)
+    term.setTextColor(color)
+    io.write(message)
+    term.setTextColor(colors.white)
+end
+
+--------------------------------------
+-- INPUT HANDLING
+--------------------------------------
+local function readNum(message)
+    colorPrint(message, colors.orange)
+    local n = tonumber(read())
+    while not n or n <= 0 do
+        colorPrint("Enter a valid positive number:", colors.red)
+        n = tonumber(read())
+    end
+    return math.floor(n)
+end
+
+--------------------------------------
+-- BLOCK COUNTING & SELECTION
+--------------------------------------
+local function countAllowedBlocks()
+    local total = 0
+    for i=1,16 do
+        local detail = turtle.getItemDetail(i)
+        if detail and allowedBlocks(detail.name) then
+            total = total + detail.count
+        end
+    end
+    return total
+end
+
+local function waitForBlocks(required)
+    while true do
+        local have = countAllowedBlocks()
+        term.clear()
+        term.setCursorPos(1,1)
+        if have >= required then
+            colorPrint("Enough allowed blocks ("..have.." / "..required..")", colors.green)
+            return
+        else
+            colorPrint("Add allowed materials only.", colors.red)
+            colorPrint("Need at least "..required.." blocks to continue.", colors.orange)
+            colorPrint("Currently have: "..have, colors.orange)
+            colorPrint("Press ENTER after adding blocks.", colors.orange)
+            read()
+        end
+    end
+end
+
+local function selectAllowedBlock()
+    for i=1,16 do
+        local detail = turtle.getItemDetail(i)
+        if detail and detail.count > 0 and allowedBlocks(detail.name) then
+            turtle.select(i)
+            return true
+        end
+    end
+    return false
+end
+
+local function placeDownSmart()
+    local exists, data = turtle.inspectDown()
+    if exists then
+        if not allowedBlocks(data.name) then
+            turtle.digDown()
+        else
+            return
+        end
+    end
+
+    while not selectAllowedBlock() do
+        colorPrint("Out of allowed blocks! Refill inventory and press ENTER.", colors.red)
+        read()
+    end
+    turtle.placeDown()
+end
+
+--------------------------------------
+-- SAFE MOVEMENT
+--------------------------------------
+local function forwardSafe()
+    while not turtle.forward() do
+        turtle.dig()
+        turtle.attack()
+        sleep(0.1)
+    end
+end
+
+local function upSafe()
+    while not turtle.up() do
+        turtle.digUp()
+        sleep(0.1)
+    end
+end
+
+local function downSafe()
+    while not turtle.down() do
+        turtle.digDown()
+        sleep(0.1)
+    end
+end
+
+local function turnRight() turtle.turnRight() end
+local function turnLeft() turtle.turnLeft() end
+
+--------------------------------------
+-- UI FUNCTIONS
+--------------------------------------
+local function drawUI(placed, total)
+    term.clear()
+    term.setCursorPos(1,1)
+    colorPrint("=== TRMP Wall Builder v0.2 BETA ===", colors.blue)
+    print(string.rep("=",30))
+
+    colorWrite("Blocks placed: ", colors.green)
+    colorPrint(placed.." / "..total, colors.orange)
+
+    -- Progress bar
+    local percent = math.floor((placed/total)*100)
+    io.write("Progress: [")
+    local bars = math.floor(percent/5)
+    for i=1,20 do
+        if i <= bars then
+            colorWrite("=", colors.blue)
+        else
+            io.write(" ")
+        end
+    end
+    colorPrint("] "..percent.."%", colors.orange)
+
+    -- Fuel
+    local fuel = turtle.getFuelLevel()
+    local fuelMax = turtle.getFuelLimit()
+    colorWrite("Fuel: ", colors.green)
+    colorPrint(fuel.." / "..fuelMax, colors.orange)
+
+    print(string.rep("=",30))
+end
+
+--------------------------------------
+-- MAIN PROGRAM
+--------------------------------------
+term.clear()
+term.setCursorPos(1,1)
+colorPrint("=== TRMP Wall Builder v0.2 BETA ===", colors.blue)
+
+local tArgs = { ... }
+local cliL, cliH, cliD = 0, 0, 0
+for i = 1, #tArgs, 2 do
+    if tArgs[i] == "-length" then cliL = math.floor(tonumber(tArgs[i + 1]) or 0)
+    elseif tArgs[i] == "-height" then cliH = math.floor(tonumber(tArgs[i + 1]) or 0)
+    elseif tArgs[i] == "-depth" then cliD = math.floor(tonumber(tArgs[i + 1]) or 0)
+    end
+end
+local length = cliL > 0 and cliL or readNum("Enter wall length (X-axis):")
+local height = cliH > 0 and cliH or readNum("Enter wall height (Z-axis):")
+local depth  = cliD > 0 and cliD or readNum("Enter wall thickness (Y-axis):")
+
+local totalBlocks = length * height * depth
+colorPrint("Total required blocks: "..totalBlocks, colors.orange)
+colorPrint("Press ENTER when blocks are loaded.", colors.green)
+read()
+
+-- Warn if exceeds MAX_CARRY
+if totalBlocks > MAX_CARRY then
+    colorPrint("WARNING: Wall requires more blocks than the turtle can carry!", colors.red)
+    colorPrint("Max carry: "..MAX_CARRY.." (16 stacks)", colors.red)
+    colorPrint("Total required blocks: "..totalBlocks, colors.orange)
+    colorPrint("A refill will be required during construction.", colors.red)
+    colorPrint("Continue? (y/n)", colors.orange)
+    while true do
+        local ans = read()
+        if ans == "y" or ans == "Y" then
+            refillMode = true
+            break
+        elseif ans == "n" or ans == "N" then
+            colorPrint("Restarting input...", colors.red)
+            sleep(0.5)
+            os.reboot()
+        else
+            colorPrint("Enter Y or N:", colors.red)
+        end
+    end
+end
+
+-- Wait for starting blocks
+local needed = refillMode and 64 or totalBlocks
+waitForBlocks(needed)
+
+-- Countdown 5 seconds
+for i=5,1,-1 do
+    term.clear()
+    term.setCursorPos(1,1)
+    colorPrint("Starting wall construction in: "..i.."...", colors.green)
+    sleep(1)
+end
+turtle.up()
+term.clear()
+term.setCursorPos(1,1)
+
+--------------------------------------
+-- BUILD LOOP
+--------------------------------------
+local placed = 0
+local goingForward = true
+
+for z=1,height do          -- vertical layers
+    for y=1,depth do       -- thickness
+        for x=1,length do  -- row
+            placeDownSmart()
+            placed = placed + 1
+            drawUI(placed, totalBlocks)
+
+            if x < length then
+                forwardSafe()
+            end
+        end
+
+        -- Snake pattern in depth
+        if y < depth then
+            if goingForward then
+                turnRight()
+                forwardSafe()
+                turnRight()
+            else
+                turnLeft()
+                forwardSafe()
+                turnLeft()
+            end
+            goingForward = not goingForward
+        end
+    end
+
+    -- Move up a layer
+    if z < height then
+        upSafe()
+        -- Reset Y facing
+        if depth % 2 == 1 then
+            turnRight(); turnRight()
+        end
+        goingForward = true
+    end
+end
+
+drawUI(totalBlocks, totalBlocks)
+colorPrint("Wall completed successfully!", colors.green)
