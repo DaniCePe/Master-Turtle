@@ -1,0 +1,3 @@
+upstream: RareMojo/cc-ai
+commit: 03b57f970581ec3d5bc20e126469a4d27bd1fd00 2023-08-27
+client: lua/client.lua shipped verbatim as program 'cc-ai'
