@@ -135,8 +135,15 @@ function T:update(data)
 --Log:saveToLog("T:update(data[1]): "..data[1]..", key/char = "..data[2])
 			if not self.focus then return end
 --Log:saveToLog("T:"..self.name.." update(data): key = "..keys.getName(data[2]))
-			self:textChanged(keys.getName(data[2]))
-			sleep(0.05)
+			-- Control keys only; printable characters arrive via "char"
+			-- events. keys.getName returns words like "one"/"left" for
+			-- digits and arrows, which must never become text.
+			local keyName = keys.getName(data[2])
+			if keyName == "backspace" or keyName == "delete"
+					or keyName == "enter" or keyName == "tab" then
+				self:textChanged(keyName)
+				sleep(0.05)
+			end
 		elseif data[1] == "char" then
 			if not self.focus then return end
 --Log:saveToLog("T:"..self.name.." update(data): char = ".. data[2])
