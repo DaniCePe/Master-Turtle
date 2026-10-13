@@ -1,4 +1,4 @@
-version = 20261013.0300
+version = 20261013.1200
 -- CROPPER v0.4 BETA (Quarry Edition)
 -- Date: 2026-10-13
 -- Inspired by Civilwargeeky's Quarry & AE2 Cluster Scanner
@@ -10,6 +10,11 @@ version = 20261013.0300
 --   - Dump excludes the fuel/bucket slot; found fuel is staged there.
 --   - Stop now SAVES progress (like the cluster scanner) instead of
 --     wiping the session; single Q press or Ctrl+T.
+--   - Cropper rework (20261013.1200): 15-point field workflow; the storage
+--     dump takes everything including seeds; inventory-full returns to
+--     start at the same Y, deposits, and resumes the saved field position;
+--     night wait with epoch day-wrap; fixed-point refuel through LoopFuel
+--     (2x SmartFuel, fuel-chest prompt added).
 -- v0.3 Changes:
 --   - Full Quarry Logic: CLI Args (-length, -width, -wait).
 --   - Persistence: Resumes exactly where left off.
@@ -33,7 +38,7 @@ local Resume = require("lib.Resume")
 local LoopSetup = require("lib.LoopSetup")
 local LoopFuel = require("lib.LoopFuel")
 local cfg = LoopSetup.defaults()
-local minFuel = 0
+local tripEst = 0
 local params = {
     length = 0,
     width = 0,
@@ -194,7 +199,7 @@ local function forward()
         if turtle.getFuelLevel() == 0 then
             -- Out of fuel: burn tagged fuel or use the bucket. If that
             -- fails too, stop (progress is saved by the error handler).
-            if not LoopFuel.ensure(cfg, minFuel) then
+            if not LoopFuel.ensure(cfg, tripEst) then
                 log("Out of fuel at "..state.x..","..state.z)
                 colorPrint("OUT OF FUEL", colors.red)
                 error("Terminated", 0)
@@ -252,16 +257,6 @@ local seeds = {
     modded = {}
 }
 
--- Seed item names: the storage dump skips these so replanting keeps working.
-local seedItems = {}
-for _, seed in pairs(seeds.vanilla) do seedItems[seed] = true end
-for _, seed in pairs(seeds.modded) do seedItems[seed] = true end
-
-local function isSeedSlot(slot)
-    local d = turtle.getItemDetail(slot)
-    return d and d.name and seedItems[d.name]
-end
-
 local function seedForCrop(name)
     return seeds.vanilla[name] or seeds.modded[name]
 end
@@ -275,50 +270,168 @@ local function findSeedSlot(seedItem)
     return nil
 end
 
-local function harvestAndReplant()
-    local exists, info = turtle.inspectDown()
-    if not exists then return end
-    
-    if (crops.vanilla[info.name] or crops.modded[info.name]) and info.state and info.state.age and info.state.age >= (maxAge[info.name] or 7) then
-        log("Harvesting "..info.name.." at "..state.x..","..state.z)
+local function inventoryCount()
+    local n = 0
+    for i=1,16 do if turtle.getItemCount(i) > 0 then n = n + 1 end end
+    return n
+end
+
+-- Set when the deposit at start fails, so a full inventory does not bounce
+-- the turtle home once per cell for the rest of the pass.
+local suppressFull = false
+
+-- One cell of the field workflow: check below; dump into an inventory below
+-- (everything, seeds included; replanting runs off the fresh harvest at each
+-- cell, so protecting seed slots only clogs slots); identify a crop below
+-- and check maturity; harvest the mature crop; suck up the drops; replant
+-- the corresponding seed or tuber.
+local function workCell()
+    local has, data = turtle.inspectDown()
+    local belowName = (has and data and data.name) or nil
+    if has and LoopSetup.isInventory("bottom") then
+        for i=1,16 do
+            if i ~= cfg.bucketSlot then
+                turtle.select(i)
+                turtle.dropDown()
+            end
+        end
+        turtle.select(1)
+        state.inventoryFull = false
+        LoopFuel.stage(cfg)
+        log("Dumped items into storage at "..state.x..","..state.z..
+            ", epoch "..os.epoch("ingame"))
+    elseif has and cfg.lavaUnder and belowName and belowName:find("lava") then
+        -- Lava below while traveling: fill the bucket when possible.
+        LoopFuel.fillFrom(turtle.inspectDown, turtle.placeDown, cfg)
+    elseif belowName and (crops.vanilla[belowName] or crops.modded[belowName])
+        and data.state and data.state.age
+        and data.state.age >= (maxAge[belowName] or 7) then
+        log("Harvesting "..belowName.." at "..state.x..","..state.z)
         turtle.digDown()
-        
-        -- Replant
-        local seedName = seedForCrop(info.name)
-        local slot = findSeedSlot(seedName)
+        turtle.suckDown()
+        local slot = findSeedSlot(seedForCrop(belowName))
         if slot then
             turtle.select(slot)
             turtle.placeDown()
             turtle.select(1)
         end
     end
-end
-
-local function checkInventory()
-    local count = 0
-    for i=1,16 do if turtle.getItemCount(i) > 0 then count = count + 1 end end
-    
-    if count >= 16 then
+    if not suppressFull and inventoryCount() >= 16 then
         state.inventoryFull = true
         log("Inventory full at "..state.x..","..state.z)
     end
-    
-    -- Opportunistic dump (fuel/bucket slot and seed stock excluded)
-    local has, data = turtle.inspectDown()
-    if has and LoopSetup.isInventory("bottom") then
-        for i=1,16 do
-            if i ~= cfg.bucketSlot and not isSeedSlot(i) then
-                turtle.select(i); turtle.dropDown()
-            end
-        end
-        turtle.select(1)
-        state.inventoryFull = false
-        LoopFuel.stage(cfg)
-        log("Dumped items into storage at "..state.x..","..state.z)
-    elseif has and cfg.lavaUnder and data.name:find("lava") then
-        -- Lava below while traveling: fill the bucket when possible.
-        LoopFuel.fillFrom(turtle.inspectDown, turtle.placeDown, cfg)
+end
+
+-- Deposit everything (bucket slot excluded) into an inventory adjacent to
+-- the start block. Returns true when a deposit inventory was found.
+local function depositAtStart()
+    local side = LoopSetup.findInventory("bottom")
+    if not side then
+        log("No deposit inventory at start")
+        return false
     end
+    LoopSetup.dropToward(side, function(i) return i ~= cfg.bucketSlot end)
+    LoopFuel.stage(cfg)
+    log("Deposited at start via "..side..", epoch "..os.epoch("ingame"))
+    return true
+end
+
+-- Inventory full with no dump chest nearby: save the field position, return
+-- to start at the same Y (this program never changes Y), deposit, and resume
+-- the saved field position.
+local function returnDepositResume()
+    local sx, sz, sf = state.x, state.z, state.facing
+    log("Inventory full, returning to start for deposit, epoch "..os.epoch("ingame"))
+    state.isReturning = true
+    saveProgress()
+    goTo(0, 0)
+    local deposited = depositAtStart()
+    state.isReturning = false
+    if inventoryCount() >= 16 then
+        if not suppressFull then
+            suppressFull = true
+            if deposited then
+                log("Deposit inventory full; continuing with a full inventory")
+            else
+                log("No deposit inventory at start; continuing with a full inventory")
+            end
+            colorPrint("WARNING: deposit at start failed", colors.red)
+        end
+    end
+    state.inventoryFull = false
+    goTo(sx, sz)
+    turnTo(sf)
+    saveProgress()
+end
+
+-- Called when the inventory is full: dump into a nearby inventory when one
+-- is found quickly, else return to start at the same Y and resume.
+local function handleFull()
+    if not state.inventoryFull then return end
+    local side = LoopSetup.findInventory("bottom")
+    if side then
+        local moved = LoopSetup.dropToward(side, function(i) return i ~= cfg.bucketSlot end)
+        LoopFuel.stage(cfg)
+        if moved then
+            state.inventoryFull = inventoryCount() >= 16
+            log("Dumped into nearby inventory ("..side..") at "..
+                state.x..","..state.z..", epoch "..os.epoch("ingame"))
+            return
+        end
+        -- Nothing moved: the nearby chest is full. Fall through to start.
+    end
+    returnDepositResume()
+end
+
+-- Once-per-cell fuel check: head home while the trip is still affordable,
+-- refuel at the fixed point, resume the saved field position. Y never
+-- changes. A user-aborted fuel wait saves and quits quietly.
+local function fuelCheck()
+    if not LoopFuel.needEvac(math.abs(state.x) + math.abs(state.z)) then return end
+    local sx, sz, sf = state.x, state.z, state.facing
+    state.isReturning = true
+    saveProgress()
+    log("Fuel low at "..sx..","..sz.."; evacuating to start, epoch "..os.epoch("ingame"))
+    goTo(0, 0)
+    local ok = LoopFuel.refuelAtStart(cfg, 2 * tripEst)
+    if not ok then
+        -- Fixed point dry: wait at the start (reachable) for fuel items.
+        ok = LoopFuel.waitForFuel(cfg, 2 * tripEst)
+    end
+    state.isReturning = false
+    if not ok then
+        saveProgress()
+        error("", 0)
+    end
+    goTo(sx, sz)
+    turnTo(sf)
+    saveProgress()
+end
+
+-- One Minecraft day is 24000 ticks; os.epoch("ingame") is game time in ms.
+local DAY_MS = 1200000
+
+local function isNightTick()
+    return (math.floor(os.epoch("ingame") / 50) % 24000) >= 12000
+end
+
+-- Wait for nightfall so crops regrow before the next pass. If the day
+-- already wrapped while this pass ran, continue instead of waiting for
+-- another night. Day wrap is epoch math, never clock subtraction.
+local function waitForNight(passStart)
+    if math.floor(os.epoch("ingame") / DAY_MS) > math.floor(passStart / DAY_MS) then
+        log("Day wrapped during the pass; skipping the night wait")
+        return
+    end
+    if isNightTick() then
+        log("Already night; starting the next pass")
+        return
+    end
+    log("Waiting for nightfall")
+    while not isNightTick() do
+        sleep(5)
+    end
+    log("Nightfall reached; starting the next pass")
 end
 
 --------------------------------------
@@ -347,7 +460,6 @@ local function parseArgs()
         local v = tArgs[i+1]
         if k == "-length" then params.length = tonumber(v)
         elseif k == "-width" then params.width = tonumber(v)
-        elseif k == "-wait" then params.waitTime = tonumber(v)
         end
     end
 end
@@ -357,51 +469,53 @@ local function getArgsInteractive()
     params.length = tonumber(read())
     colorPrint("Enter Field Width:", colors.orange)
     params.width = tonumber(read())
-    colorPrint("Wait Time (seconds):", colors.orange)
-    params.waitTime = tonumber(read()) or 0
 end
 
 local function scanLogic()
     state.totalScanned = 0
     state.isReturning = false
-    log("Starting cycle "..state.cycleCount)
-    
+    suppressFull = false
+    -- The turtle hovers one block above the field for the whole pass.
+    -- Return and resume move in x/z only; Y never changes (breaks crops).
+    local passStart = os.epoch("ingame")
+    log("Pass start, epoch "..passStart)
+
     for x = 0, state.params.width - 1 do
         goTo(x, state.z)
         local targetZ = (x % 2 == 0) and (state.params.length - 1) or 0
-        
+
         while state.z ~= targetZ do
-            harvestAndReplant()
-            checkInventory()
+            workCell()
+            handleFull()
+            fuelCheck()
             if state.z < targetZ then turnTo(0); forward()
             else turnTo(2); forward() end
             state.totalScanned = state.totalScanned + 1
         end
-        harvestAndReplant()
-        checkInventory()
+        workCell()
+        handleFull()
+        fuelCheck()
     end
-    
-    log("Cycle complete, returning to start")
+
+    -- Field done: return to start at the same Y, refuel at the fixed point,
+    -- then wait for nightfall before the next pass.
+    log("Pass finish, epoch "..os.epoch("ingame"))
     state.isReturning = true
     goTo(0,0)
     turnTo(0)
-    -- Back at start facing the start direction: refill the bucket from
-    -- the stated lava side when possible.
-    LoopFuel.fillAtStart(cfg)
-    
+    if not LoopFuel.refuelAtStart(cfg, 2 * tripEst) then
+        -- Fixed point dry: wait at the start (reachable) for fuel items.
+        if not LoopFuel.waitForFuel(cfg, 2 * tripEst) then
+            saveProgress()
+            error("", 0) -- quiet quit; the fuel wait was aborted by the user
+        end
+    end
+
     state.cycleCount = state.cycleCount + 1
     logRunSummary()
     saveProgress()
-    
-    if state.params.waitTime > 0 then
-        log("Waiting "..state.params.waitTime.."s")
-        for i=state.params.waitTime, 1, -1 do
-            term.clear()
-            term.setCursorPos(1,1)
-            colorPrint("Waiting: "..i.."s", colors.yellow)
-            sleep(1)
-        end
-    end
+
+    waitForNight(passStart)
 end
 
 local function listenForExit()
@@ -464,6 +578,7 @@ if state.x == 0 and state.z == 0 and state.cycleCount == 0 then
         blurb = "Farms the field below: harvests mature crops, replants, dumps into chests found below.",
         fuel = true,
         fuelTags = true,
+        fuelChest = true,
         lava = true,
         bucketSlot = 16,
     })
@@ -479,10 +594,10 @@ if state.x == 0 and state.z == 0 and state.cycleCount == 0 then
     promptStart(false)
 end
 
--- Enough fuel for a full cycle plus the trip home, capped at the limit.
-minFuel = LoopFuel.capEst(2 * state.params.length * state.params.width + 10)
+-- One-way trip estimate; ensure() doubles it internally (2x SmartFuel).
+tripEst = state.params.length * state.params.width + 10
 
-if not LoopFuel.ensure(cfg, minFuel) then
+if not LoopFuel.ensure(cfg, tripEst) then
     print("Not enough fuel to start.")
     return
 end
@@ -491,7 +606,7 @@ while true do
     local ok, err = pcall(runScan)
 
     if not ok then
-        if err == "Terminated" then
+        if err == "Terminated" or err == "" then
             saveProgress()
             colorPrint("\nStopped. Progress saved; reboot or re-run to resume.", colors.green)
             return
