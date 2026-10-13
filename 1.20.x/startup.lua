@@ -1,4 +1,4 @@
-local version = 20261012.1200
+local version = 20261013.0300
 -- Master Turtle startup.
 -- Boots the Master Turtle launcher menu.
 --
@@ -27,7 +27,6 @@ if fs.exists("Civil_Quarry_Restore") then
     if resume then
         print("Resuming quarry...")
         shell.run("quarry", "-resume")
-        return
     end
 end
 

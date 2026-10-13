@@ -1,4 +1,4 @@
-version = 20261013.0200
+version = 20261013.0300
 --[[
 	Last edited: see version YYYYMMDD.HHMM
 	Master Turtle pack installer/updater.
@@ -9,7 +9,6 @@ version = 20261013.0200
 ]]
 
 local tmpDir = "tmp"	-- set temp folder name to 'tmp'
-local files = {}		-- table of files
 local fileSizes = {}	-- table of current file sizes
 local fast = false	-- fast mode: skip delays, quiet output
 
@@ -55,7 +54,7 @@ function checkLabel()
 				noname = false
 			end
 			if noname then
-				sleep(2)
+				dsleep(2)
 			end
 		end
 		
@@ -78,12 +77,17 @@ function checkFile(url, fileName, tmpDir)
 		vlog("Missing fileName "..fileName..", trying Github")
 	end
 	local fileURL = url..fileName
-	-- eg "https://raw.githubusercontent.com/Inksaver/Computercraft-GUI/main/lib/ui/Multibutton.lua"
+	-- eg "https://raw.githubusercontent.com/DaniCePe/Master-Turtle/main/<tree>/lib/ui/Multibutton.lua"
 	local response, message = http.get(fileURL)
 	if response == nil then
 		log("failed to get "..fileName.." from Github")
 	else
 		local data = response.readAll()
+		if not data or data == "" then
+			log("empty download "..fileName)
+			response.close()
+			return false
+		end
 		response.close()
 		local tempFile = getTempFileName(fileName)
 		local h = fs.open(tempFile, "w")
@@ -126,7 +130,7 @@ function getVersion(line, fileName)
 		local start = line:find("=")
 		
 		if start ~= nil then -- found
-			version = tonumber(line:sub(start + 1))
+			version = tonumber(line:sub(start + 1)) or 0
 		end
 	end
 	
@@ -165,7 +169,7 @@ function isNewer(fileName, tmpDir)
 			end
 			if not move then
 				-- Local copy is corrupt but the download parses: replace it.
-				local tempFile = getTempFileName(fileName)
+				tempFile = getTempFileName(fileName)
 				if loadfile(fileName) == nil and loadfile(tempFile) ~= nil then
 					log(fileName.." local copy is corrupt, replacing with download")
 					move = true
@@ -210,7 +214,7 @@ computer_space_limit = 2000000 or more
 6. Run the updater again
 ]]
 		log(message)
-		return -1
+		return 0, true
 	else
 		if checkFile(url, fileName, tmpDir) then			-- download fileName to /tmp
 			if isNewer(fileName, tmpDir) then
@@ -245,7 +249,6 @@ function addFileSize(fileSizes, fileName)
 end
 
 function main()
-	local doContinue = true							-- set continue flag						
 	clear()
 	checkLabel() 									-- make sure turtle label is set
 	io.write("Fast update (skip delays, quiet output)? [Y/n]: ")
@@ -308,7 +311,9 @@ function main()
 	
 	local url = "https://raw.githubusercontent.com/DaniCePe/Master-Turtle/main/1.20.x/"
 	for _, file in ipairs(fileList) do
-		updated = updated + process(url, file, tmpDir, fileSizes)
+		local n, abort = process(url, file, tmpDir, fileSizes)
+		updated = updated + n
+		if abort then break end
 		-- download files from our Github repo to tmp/
 	end
 	
@@ -318,7 +323,7 @@ function main()
 	if status then
 		vlog("./"..tmpDir.." deleted")
 	else
-		log("Directory delete error message:\n "..tostring(retVal))
+		log("Directory delete error message:\n "..tostring(retval))
 	end
 	clear()
 	log("\nOperation Complete ")

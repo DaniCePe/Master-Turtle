@@ -4,6 +4,24 @@ This pack unifies a private `MasterTurtle.zip` (turtle programs plus
 Inksaver's toolkit) into a public repo with a launcher, an updater, and
 two version trees. Everything below is relative to the zip contents.
 
+## Unreleased (ponytail pass, 2026-10-13)
+
+- Launcher (`master.lua`): fixed a crash returning from "Toolkit v3";
+  tk3 replaces `_G.sm`/`_G.events` and the launcher now saves and
+  restores them around every program run. Dropped the unused `Quit`
+  scene from the launcher SceneMgr (nothing ever switches to it).
+- Updater hardening (`updater.lua`, `installer.lua`): `getVersion`
+  defaults to 0 when the version line has no number; empty downloads
+  are rejected before the syntax check; disk-full aborts the file loop
+  instead of accumulating -1 counts; the installer detects dan200
+  CC 1.89 on 1.12.2 via `_MC_VERSION` (old `_HOST` pattern never
+  matched) and downloads to `updater.new`, validating with
+  `loadfile` before replacing the old updater.
+- Fixed the 0-fuel livelock fixes in the movers so an empty fuel slot
+  no longer spins forever without progress.
+- Version-aware inventory detection: fuel and bucket handling now keys
+  off what the inventory actually holds rather than assuming slots.
+
 ## v1.2 (2026-10-13): loop starter prompts, tags, refuel
 
 Autonomy rule: every question is answered once at the startup prompt.

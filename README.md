@@ -111,10 +111,6 @@ installs an extensionless `startup` stub that takes boot precedence and
 auto-resumes (with a 5-second abort window); when our `startup.lua`
 boots without that stub but finds the save, it offers the resume.
 
-Note: the quarry uses classic Lua environment functions. On newer
-CC:Tweaked, set `disable_lua51_features = false` in the mod config or
-the quarry will not load.
-
 ### Platformer (builder)
 
 `platformer`: was a floor clearer, now a real builder (v6.1). Lays
@@ -244,7 +240,8 @@ time).
 ## Files
 
 - `master.lua`: the launcher; `startup.lua` boots it.
-- `scenes/`: launcher screens (Launcher, Dimensions, CCAI).
+- `scenes/`: launcher screens (Launcher, Dimensions, CCAI) plus the
+  Toolkit v3 scenes it loads (MainMenu, GetItems, Help, TaskOptions, Quit).
 - `lib/`: shared libraries, including `lib/Resume.lua`.
 - `optional/cc-ai/`: the optional AI chat module and server setup.
 - `updater.lua`: installer/updater for this repo.

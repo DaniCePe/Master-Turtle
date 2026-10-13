@@ -1,11 +1,10 @@
-local version = 20261012.1200
+local version = 20261013.0300
 -- Master Turtle launcher v1.0
 -- Unified GUI menu for every program in the Master Turtle pack.
 -- Built on the Inksaver lib/ui + scenes framework.
 -- Select a program, answer any dimension prompts, and it runs;
 -- when it exits you return here. Run at boot via startup.lua.
 
-local tArgs = { ... }
 local unpack = table.unpack or unpack
 
 -- Globals required by the lib/ui + scenes framework
@@ -132,7 +131,9 @@ local function runProgram(launch)
         print("Args: " .. table.concat(launch.args, " "))
     end
     print("")
-    local ok, err = shell.run(launch.prog, (table.unpack or unpack)(launch.args or {}))
+    local saveSm, saveEv = _G.sm, _G.events
+    local ok, err = shell.run(launch.prog, unpack(launch.args or {}))
+    _G.sm, _G.events = saveSm, saveEv
     print("")
     if not ok then
         print("Exited with error: " .. tostring(err))
@@ -146,7 +147,7 @@ end
 _G.MasterTurtle.runProgram = runProgram
 
 -- Boot
-_G.sm = SceneMgr("scenes", { "Launcher", "Dimensions", "CCAI", "Quit" })
+_G.sm = SceneMgr("scenes", { "Launcher", "Dimensions", "CCAI" })
 _G.sm:switch("Launcher")
 
 while true do
