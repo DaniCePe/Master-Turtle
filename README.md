@@ -19,10 +19,19 @@ needs), so there is nothing to configure.
 
 ## Install
 
-On a fresh turtle or computer, fetch the updater for your version
-with wget (HTTP must be enabled in your ComputerCraft config), then run
-it. It downloads every file from this repo and only replaces files that
-are older than the download.
+Easiest way, on a fresh turtle or computer (HTTP must be enabled in
+your ComputerCraft config):
+
+```
+pastebin get piTvMqye installer
+installer
+```
+
+The installer detects your version (1.12.x or 1.20.x+), downloads the
+updater, and runs it. After the first install, just run `updater` to
+update.
+
+Manual alternative with wget, if you prefer:
 
 Minecraft 1.12.2:
 
@@ -37,8 +46,6 @@ Minecraft 1.20+:
 wget https://raw.githubusercontent.com/DaniCePe/Master-Turtle/main/1.20.x/updater.lua updater
 updater
 ```
-
-(After the first install, just run `updater` to update.)
 
 The updater installs to the current directory. It never touches your
 save files (`Civil_Quarry_Restore`, `.platformer_restore`, etc.) or the
