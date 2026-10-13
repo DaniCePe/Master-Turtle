@@ -1,4 +1,4 @@
-version = 20261013.0100
+version = 20261013.0200
 --[[
 	Last edited: see version YYYYMMDD.HHMM
 	Master Turtle pack installer/updater.
@@ -91,6 +91,11 @@ function checkFile(url, fileName, tmpDir)
 			-- Save new fileName
 			h.write(data)
 			h.close()
+			if loadfile(tempFile) == nil then
+				log("Downloaded "..fileName.." failed syntax check, discarding")
+				fs.delete(tempFile)
+				return false
+			end
 			vlog(fileName.." saved from Github to ".. tempFile)
 			return true
 		end
@@ -157,6 +162,14 @@ function isNewer(fileName, tmpDir)
 				end
 			elseif oldVer == 0 and newVer > 0 then				-- new file has a number
 				move = true
+			end
+			if not move then
+				-- Local copy is corrupt but the download parses: replace it.
+				local tempFile = getTempFileName(fileName)
+				if loadfile(fileName) == nil and loadfile(tempFile) ~= nil then
+					log(fileName.." local copy is corrupt, replacing with download")
+					move = true
+				end
 			end
 		end
 	end

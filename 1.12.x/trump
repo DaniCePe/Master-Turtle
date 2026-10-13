@@ -1,4 +1,6 @@
-version = 20261012.1200
+version = 20261013.0100
+local allowedLib = require("lib.allowedBlocks")
+local allowedBlocks = allowedLib.allowedBlocks
 -- TRMP.lua v0.4 BETA
 	-- Added go up once so it can safely start on the ground level.
 -- TRMP.lua v0.3 BETA

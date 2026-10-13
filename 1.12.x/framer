@@ -1,4 +1,6 @@
-version = 20261012.1200
+version = 20261013.0100
+local allowedLib = require("lib.allowedBlocks")
+local allowedBlocks = allowedLib.allowedBlocks
 -- FRAME BUILDER v0.1
 	-- Builds either:
 		-- A) A hollow ROOM (full shell)
