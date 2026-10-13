@@ -1,4 +1,4 @@
-version = 20261013.0300
+version = 20261013.1700
 -- INFINITE MINER v5.1
 -- Mines forever, listens for Q (or Ctrl+T) to stop, auto-dumps generable
 -- blocks into chests and everything else to your dump side.
@@ -97,7 +97,7 @@ local function miningLoop()
         -- mine cobblestone
         if turtle.detect() then
             local ok, data = turtle.inspect()
-            if ok and data.name == COBBLE then
+            if ok and GENERABLE[data.name] then
                 turtle.dig()
                 mined = mined + 1
             end

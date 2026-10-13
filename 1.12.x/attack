@@ -1,10 +1,9 @@
-version = 20261013.0300
+version = 20261013.1700
 -- Attacker v2.2 (CC:Tweaked)
 -- Features:
 --  * Continuous attacks forward
 --  * Adjustable delay between attacks
 --  * Auto-select weapon (prefers swords)
---  * Auto-refuel from inventory
 --  * Auto-dump items to chests if 6+ slots are filled
 --  * Trash side + item tags: tagged loot goes to the trash side,
 --    everything else to the auto-detected chest (trash side is never
@@ -71,24 +70,6 @@ local function selectWeapon()
         if turtle.getItemCount(slot) > 0 then turtle.select(slot) return true end
     end
     return true
-end
-
-local function tryRefuelIfNeeded()
-    local fuel = turtle.getFuelLevel()
-    if type(fuel) ~= "number" or fuel > 100 then return true end
-
-    local fuelNames = {
-        ["minecraft:coal"]=true, ["minecraft:charcoal"]=true,
-        ["minecraft:coal_block"]=true, ["minecraft:lava_bucket"]=true
-    }
-    for slot=1,16 do
-        local d = turtle.getItemDetail(slot)
-        if d and d.name and fuelNames[d.name] then
-            turtle.select(slot)
-            if turtle.refuel(1) then return true end
-        end
-    end
-    return false
 end
 
 --------------------------------------
@@ -179,11 +160,6 @@ end
 --------------------------------------
 local function continuousWorker(delay)
     while not stopFlag do
-        if not tryRefuelIfNeeded() then
-            colorPrint("Low fuel, stopping.", colors.red)
-            stopFlag = true
-            return
-        end
         if occupiedSlots() >= 6 then
             colorPrint("Inventory busy, dumping items...", colors.orange)
             local dumped = dumpToChest()

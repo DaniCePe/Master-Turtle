@@ -1,4 +1,4 @@
-version = 20261013.1200
+version = 20261013.1700
 -- CROPPER v0.4 BETA (Quarry Edition)
 -- Date: 2026-10-13
 -- Inspired by Civilwargeeky's Quarry & AE2 Cluster Scanner
@@ -236,7 +236,9 @@ local crops = {
         ["minecraft:potatoes"] = true,
         ["minecraft:beetroots"] = true
     },
-    modded = {}
+    modded = {
+        ["thermal:rice"] = true,
+    }
 }
 
 -- Mature age per crop: beetroots finish at 3, the rest at 7.
@@ -245,6 +247,7 @@ local maxAge = {
     ["minecraft:carrots"] = 7,
     ["minecraft:potatoes"] = 7,
     ["minecraft:beetroots"] = 3,
+    ["thermal:rice"] = 7,
 }
 
 local seeds = {
@@ -254,7 +257,9 @@ local seeds = {
         ["minecraft:potatoes"] = "minecraft:potato",
         ["minecraft:beetroots"] = "minecraft:beetroot_seeds"
     },
-    modded = {}
+    modded = {
+        ["thermal:rice"] = "thermal:rice_seeds",
+    }
 }
 
 local function seedForCrop(name)
@@ -266,6 +271,27 @@ local function findSeedSlot(seedItem)
     for s=1,16 do
         local d = turtle.getItemDetail(s)
         if d and d.name == seedItem then return s end
+    end
+    return nil
+end
+
+-- All known seed items, vanilla + modded; used to plant empty farmland.
+local function allSeedItems()
+    local items = {}
+    for _, seed in pairs(seeds.vanilla) do items[#items + 1] = seed end
+    for _, seed in pairs(seeds.modded) do items[#items + 1] = seed end
+    return items
+end
+
+local function findAnySeedSlot()
+    local items = allSeedItems()
+    for s=1,16 do
+        local d = turtle.getItemDetail(s)
+        if d and d.name then
+            for _, seed in ipairs(items) do
+                if d.name == seed then return s end
+            end
+        end
     end
     return nil
 end
@@ -310,6 +336,14 @@ local function workCell()
         turtle.digDown()
         turtle.suckDown()
         local slot = findSeedSlot(seedForCrop(belowName))
+        if slot then
+            turtle.select(slot)
+            turtle.placeDown()
+            turtle.select(1)
+        end
+    elseif belowName == "minecraft:farmland" then
+        -- Empty farmland: plant any known seed from inventory.
+        local slot = findAnySeedSlot()
         if slot then
             turtle.select(slot)
             turtle.placeDown()
@@ -521,7 +555,7 @@ end
 local function listenForExit()
     while true do
         local ev, p1 = os.pullEvent()
-        if ev == "terminate" or (ev == "key" and (p1 == keys.q or p1 == keys.enter)) then
+        if ev == "terminate" or (ev == "key" and p1 == keys.q) then
             error("Terminated", 0)
         end
     end
@@ -531,40 +565,45 @@ local function runScan()
     parallel.waitForAny(scanLogic, listenForExit)
 end
 
+-- Returns false when the user aborts with Q; the caller then exits cleanly
+-- so the MT launcher menu resumes (no error to the shell).
 local function promptStart(resume)
-    local timer = os.startTimer(5)
     local msg = resume and "Resuming" or "Starting"
-    
-    while true do
+    local count = 5
+
+    while count > 0 do
         term.clear()
         term.setCursorPos(1,1)
         colorPrint("=== CROPPER v"..VERSION.." ===", colors.blue)
         if resume then colorPrint("Previous session restored.", colors.green) end
-        
-        colorPrint(msg.." in 5 seconds...", colors.yellow)
+
+        colorPrint(msg.." in "..count.." seconds...", colors.yellow)
         colorPrint("Press ENTER to start immediately.", colors.green)
         colorPrint("Press Q to CANCEL and ABORT.", colors.red)
-        
+
+        local timer = os.startTimer(1)
         local ev, p1 = os.pullEventRaw() -- Catch terminate during prompt
         if ev == "terminate" then
             fullCleanup()
             colorPrint("\nTerminated by user (Cleanup Complete).", colors.red)
             error("Terminated", 0)
-        elseif ev == "timer" and p1 == timer then break
+        elseif ev == "timer" and p1 == timer then
+            count = count - 1
         elseif ev == "key" then
             if p1 == keys.enter then break
             elseif p1 == keys.q then
                 fullCleanup()
                 colorPrint("\nAborted by user (Safe Cleanup Complete).", colors.red)
-                error("", 0)
+                return false
             end
         end
     end
+    return true
 end
 
 if loadProgress() then
     if state.setup then cfg = state.setup end
-    promptStart(true)
+    if not promptStart(true) then return end
 end
 
 if state.x == 0 and state.z == 0 and state.cycleCount == 0 then
@@ -591,7 +630,7 @@ if state.x == 0 and state.z == 0 and state.cycleCount == 0 then
     state.params = params
     saveProgress()
     createStartup()
-    promptStart(false)
+    if not promptStart(false) then return end
 end
 
 -- One-way trip estimate; ensure() doubles it internally (2x SmartFuel).

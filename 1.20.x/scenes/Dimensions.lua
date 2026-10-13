@@ -1,4 +1,4 @@
-local version = 20261012.1200
+local version = 20261013.1700
 -- scenes/Dimensions.lua
 -- Dimension prompt dialog: one row per dimension (label + textbox),
 -- OK builds the command-line args and launches, Cancel goes back.
@@ -37,9 +37,9 @@ function S:enter(program)
 
     for i, dim in ipairs(program.dims) do
         local numeric = dim.flag ~= "-mode" and dim.flag ~= "-inverted"
-        local lbl = Label("lblDim" .. i, 2, y, 21, 1,
+        local lbl = Label("lblDim" .. i, 2, y, 26, 1,
             dim.label, colors.white, colors.black, "left", "centre")
-        local box = Textbox("txtDim" .. i, 24, y, 12, 1,
+        local box = Textbox("txtDim" .. i, 29, y, 12, 1,
             "", colors.white, colors.blue, "left", "centre", numeric, i)
         self.em:add(lbl, "lblDim" .. i)
         self.em:add(box, "txtDim" .. i)

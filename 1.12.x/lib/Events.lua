@@ -1,4 +1,4 @@
-version = 20261013.0300
+version = 20261013.1700
 -- pastebin(1): Y0vZ9Zgj lib.Events.lua
 -- pastebin(2):
 local Class = require("lib.Class")
@@ -74,8 +74,7 @@ function Events:invoke(eventType, ...)
 	]]
 --Log:writeTraceTable("Events:invoke("..eventType..", ...) - ... = ", Events.getTraceTable(self, ...))
 --Log:saveToLog("Events:invoke("..eventType..", ...): eg ... = self, self.checked")
-	--if self.handlers[eventType] == nil then return end
-	assert(self.handlers[eventType] ~= nil, "Event of type ".. eventType .." does not exist")
+	if self.handlers[eventType] == nil then return end
 --Log:saveToLog("Events:self.handlers["..eventType.."]", textutils.serialize(self.handlers[eventType]))
 --Log:writeTraceTable("Events:invoke("..eventType..", ...)", Events.getTraceHandlers(self, eventType))
 	local tbl = self.handlers[eventType]	-- find the handler eg "onChkClick"

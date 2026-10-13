@@ -1,4 +1,4 @@
-version = 20261013.1200
+version = 20261013.1700
 -- blockman: Block Manager
 -- Lists the full effective allowed block list and lets the user add or
 -- remove entries. User additions persist via the CC settings API
@@ -26,27 +26,44 @@ local function sortedKeys(t)
     return keys
 end
 
--- Print the numbered effective list; return the entries table.
-local function showList()
+local PER_PAGE = 12
+
+-- Build the numbered effective list; numbering is global across pages.
+local function buildEntries()
     local entries = {}
-    local n = 0
-    print("Allowed building blocks:")
     for _, name in ipairs(sortedKeys(allowedLib.allowed)) do
-        n = n + 1
-        entries[n] = { name = name, user = false }
-        print(string.format("  %d. %s", n, name))
+        entries[#entries + 1] = { name = name, user = false }
     end
     for _, name in ipairs(sortedKeys(userExtra())) do
         if not allowedLib.allowed[name] then
-            n = n + 1
-            entries[n] = { name = name, user = true }
-            print(string.format("  %d. %s  [user]", n, name))
+            entries[#entries + 1] = { name = name, user = true }
         end
     end
-    if n == 0 then
-        print("  (none)")
-    end
     return entries
+end
+
+-- Print one page; return the clamped page number and page count.
+local function showPage(entries, page)
+    local pages = math.max(1, math.ceil(#entries / PER_PAGE))
+    if page < 1 then page = 1 end
+    if page > pages then page = pages end
+    term.clear()
+    term.setCursorPos(1, 1)
+    print("Block Manager (page " .. page .. "/" .. pages .. ")")
+    print("")
+    if #entries == 0 then
+        print("  (none)")
+    else
+        local from = (page - 1) * PER_PAGE + 1
+        local to = math.min(#entries, page * PER_PAGE)
+        for n = from, to do
+            local e = entries[n]
+            print(string.format("  %d. %s%s", n, e.name,
+                e.user and "  [user]" or ""))
+        end
+    end
+    print("")
+    return page, pages
 end
 
 local function saveExtra(extra)
@@ -80,6 +97,8 @@ local function doAdd()
     else
         print("Could not save settings.")
     end
+    print("Press Enter to continue.")
+    read()
 end
 
 local function doRemove(entries)
@@ -107,6 +126,8 @@ local function doRemove(entries)
     else
         print("Could not save settings.")
     end
+    print("Press Enter to continue.")
+    read()
 end
 
 term.clear()
@@ -116,20 +137,32 @@ print("Version: " .. version)
 print("")
 
 while true do
-    local entries = showList()
-    print("")
-    print("[a]dd  [r]emove  [q]uit")
-    io.write("> ")
-    local choice = (read() or ""):lower()
-    if choice == "q" then
-        break
-    elseif choice == "a" then
-        doAdd()
-        print("")
-    elseif choice == "r" then
-        doRemove(entries)
-        print("")
+    local entries = buildEntries()
+    local page = 1
+    local done = false
+    while not done do
+        local pages
+        page, pages = showPage(entries, page)
+        print("[a]dd  [r]emove  [n]ext  [p]rev  [q]uit")
+        io.write("> ")
+        local choice = (read() or ""):lower()
+        if choice == "q" then
+            done = true
+        elseif choice == "a" then
+            doAdd()
+            break
+        elseif choice == "r" then
+            doRemove(entries)
+            break
+        elseif choice == "n" then
+            page = page + 1
+            if page > pages then page = 1 end
+        elseif choice == "p" then
+            page = page - 1
+            if page < 1 then page = pages end
+        end
     end
+    if done then break end
 end
 
 print("Block Manager closed.")

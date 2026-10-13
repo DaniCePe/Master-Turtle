@@ -1,4 +1,4 @@
-version = 20261013.0300
+version = 20261013.1700
 -- https://pastebin.com/FRGfpRgM lib.ui.ListBox.lua
 local Class = require("lib.Class")
 local Vector2 = require("lib.Vector2")
@@ -96,6 +96,12 @@ function ListBox:setHighlightRow(row)
 	if #self.displayList >= row then
 		self.highlightRow = row
 		self.selectedText = self.displayList[self.highlightRow]
+		local height = self.size.y
+		if row < self.listIndex then
+			self.listIndex = row
+		elseif row > self.listIndex + height - 1 then
+			self.listIndex = row - height + 1
+		end
 	end
 end
 

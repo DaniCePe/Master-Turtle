@@ -1,4 +1,4 @@
-local version = 20261012.1200
+local version = 20261013.1700
 -- scenes/Launcher.lua
 -- Master Turtle main menu: scrollable program list, Run/Quit.
 -- Keyboard: up/down moves, Enter runs, Q quits. Mouse also works.
@@ -37,6 +37,8 @@ function S:new(sceneMgr)
         "", colors.lightGray, colors.black, "left", "centre")
     self.btnRun = Button("btnRun", 2, H - 1, 10, 1,
         "Run", colors.black, colors.lime, "centre", "centre", 0, "", self.name)
+    self.btnInfo = Button("btnInfo", 21, H - 1, 10, 1,
+        "Info", colors.white, colors.blue, "centre", "centre", 0, "", self.name)
     self.btnQuit = Button("btnQuit", W - 11, H - 1, 10, 1,
         "Quit", colors.black, colors.red, "centre", "centre", 0, "q", self.name)
 
@@ -44,6 +46,7 @@ function S:new(sceneMgr)
     self.em:add(self.lst, "lstProg")
     self.em:add(self.lblDesc, "lblDesc")
     self.em:add(self.btnRun, "btnRun")
+    self.em:add(self.btnInfo, "btnInfo")
     self.em:add(self.btnQuit, "btnQuit")
 
     self.selIdx = 1
@@ -98,7 +101,37 @@ function S:onBtnClick(button)
         _G.MasterTurtle.quit = true
     elseif button.name == "btnRun" then
         self:runSelected()
+    elseif button.name == "btnInfo" then
+        self:showInfo()
     end
+end
+
+function S:showInfo()
+    local p = self:selectedEntry()
+    if not p then return end
+    local W = _G.WIDTH
+    term.setBackgroundColor(colors.black)
+    term.clear()
+    term.setCursorPos(1, 1)
+    term.setTextColor(colors.yellow)
+    print(p.name)
+    print("")
+    term.setTextColor(colors.white)
+    local text = p.desc .. (p.loop and " [runs until stopped]" or "")
+    local line = ""
+    for word in text:gmatch("%S+") do
+        if #line + #word + 1 > W then
+            print(line)
+            line = word
+        else
+            line = line == "" and word or (line .. " " .. word)
+        end
+    end
+    if line ~= "" then print(line) end
+    print("")
+    term.setTextColor(colors.lightGray)
+    print("Press any key to return.")
+    os.pullEvent("key")
 end
 
 function S:runSelected()
@@ -124,6 +157,8 @@ function S:update(data)
             self:setSelectedIndex(self.selIdx + 1)
         elseif key == keys.enter then
             self:runSelected()
+        elseif key == keys.i then
+            self:showInfo()
         end
     end
 end

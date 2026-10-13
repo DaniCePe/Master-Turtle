@@ -1,4 +1,4 @@
-version = 20261013.0300
+version = 20261013.1700
 -------------------------------------
 -- YES/NO DICTIONARIES
 -------------------------------------
@@ -106,7 +106,7 @@ local function crankLoop()
 
     while not stopFlag do
         turtle.place()
-        sleep(0.05)
+        sleep(0.4)
 
         local elapsed = os.clock() - startTime
         term.setCursorPos(1, timerY)

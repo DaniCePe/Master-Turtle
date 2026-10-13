@@ -1,4 +1,4 @@
-local version = 20261013.1200
+local version = 20261013.1700
 -- Master Turtle launcher v1.0
 -- Unified GUI menu for every program in the Master Turtle pack.
 -- Built on the Inksaver lib/ui + scenes framework.
@@ -80,9 +80,9 @@ _G.MasterTurtle = {
         { prog = "chopchop", name = "ChopChop",
           desc = "Tree chopper", loop = true },
         { prog = "cranker", name = "Cranker",
-          desc = "Crank machine driver", loop = true },
+          desc = "Create hand crank driver: simulates player right-click via turtle.place, one click every 8 ticks (32 RPM max)", loop = true },
         { prog = "attack", name = "Attacker",
-          desc = "Auto attacker, weapon select + refuel", loop = true },
+          desc = "Auto attacker, weapon select", loop = true },
         { prog = "cobble", name = "Cobble Miner",
           desc = "Infinite miner, dumps to chests", loop = true },
         { prog = "flint", name = "Flint Maker",
