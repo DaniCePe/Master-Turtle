@@ -1,4 +1,4 @@
-version = 20261013.2000
+version = 20261013.2030
 -- Lua 5.2 compat (CC:Tweaked 1.109+): restore the 5.1-isms this program uses when missing.
 if not loadstring then loadstring = load end
 if not unpack then unpack = table.unpack end
@@ -834,15 +834,21 @@ end
 
 
 local function saveProgress(extras) --Session persistence
-exclusions = { modem = true, shell = true, _ENV = true}
+exclusions = { modem = true, shell = true, _ENV = true, MasterTurtle = true,
+  turtle = true, fs = true, os = true, term = true, textutils = true,
+  http = true, peripheral = true, rednet = true, gps = true, colours = true,
+  colors = true, keys = true, multishell = true, settings = true, _G = true}
 if doBackup then
 local toWrite = ""
 for a,b in pairs(getfenv(1)) do
   if not exclusions[a] then
       --print(a ,"   ", b, "   ", type(b)) --Debug
     if type(b) == "string" then b = "\""..b.."\"" end
-    if type(b) == "table" then b = textutils.serialize(b) end
-    if type(b) ~= "function" then
+    if type(b) == "table" then
+      local ok, ser = pcall(textutils.serialize, b)
+      if ok then b = ser else b = nil end
+    end
+    if b ~= nil and type(b) ~= "function" then
       toWrite = toWrite..a.." = "..tostring(b).."\n"
     end
   end
