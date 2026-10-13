@@ -1,4 +1,4 @@
-local version = 20261013.1700
+local version = 20261013.1800
 -- scenes/Launcher.lua
 -- Master Turtle main menu: scrollable program list, Run/Quit.
 -- Keyboard: up/down moves, Enter runs, Q quits. Mouse also works.
@@ -11,7 +11,7 @@ local ListBox = require("lib.ui.ListBox")
 local S = Scene:derive("launcher")
 
 local function displayName(p)
-    return p.name .. (p.loop and " [LOOP]" or "")
+    return p.name
 end
 
 function S:new(sceneMgr)
