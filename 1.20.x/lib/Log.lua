@@ -1,4 +1,4 @@
-local version = 20250914.1600
+version = 20261013.0300
 --pastebin(1): 8BUDQj24 lib.Log.lua
 --pastebin(2): gKj8hCHD
 local Class = require("lib.Class")
@@ -119,13 +119,13 @@ end
 
 function Log:writeTraceTable(description, tblTrace)
 	description = description or ""
-	self:appendLine(self, description)
+	self:appendLine(description)
 	if type(tblTrace) == "table" then
 		for _, line in ipairs(tblTrace) do
 			Log.appendLine(self, "    "..line)
 		end
 	else
-		self:appendLine(self, "    "..tostring(tblTrace))
+		self:appendLine("    "..tostring(tblTrace))
 	end
 end
 

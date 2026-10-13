@@ -1,3 +1,4 @@
+version = 20261013.0300
 -- lib/LoopSetup.lua: shared starter prompt for run-until-stopped programs.
 -- Autonomy rule: every question is answered ONCE here. Mid-run, the
 -- turtle never waits for input.
@@ -222,17 +223,36 @@ function LoopSetup.dropToward(side, filter)
     return moved
 end
 
--- Find the first side (in fixed order) whose neighbor matches
--- isChestFn(name). excludeSide is skipped. Returns side name or nil.
-function LoopSetup.findSide(isChestFn, excludeSide)
+local INVENTORY_NAMES = { "chest", "barrel", "shulker", "hopper", "dropper", "dispenser" }
+
+local function nameIsInventory(name)
+    if not name then return false end
+    for _, n in ipairs(INVENTORY_NAMES) do
+        if name:find(n, 1, true) then return true end
+    end
+    return false
+end
+
+-- True if the block on the given turtle-relative side is an inventory.
+-- CC:Tweaked: peripheral type check (covers hoppers and modded inventories).
+-- dan200 CC: name fallback (inventories are not peripherals there).
+-- Never moves items, so a failed detection cannot lose anything.
+function LoopSetup.isInventory(side)
+    if peripheral.hasType then
+        local ok, res = pcall(peripheral.hasType, side, "inventory")
+        if ok and res then return true end
+    end
+    faceSide(side)
+    local ok, data = turtle[SIDE_INSPECT[side]]()
+    unfaceSide(side)
+    return (ok and data and nameIsInventory(data.name)) or false
+end
+
+-- First side in SIDE_ORDER (skipping excludeSide) holding an inventory.
+function LoopSetup.findInventory(excludeSide)
     for _, side in ipairs(SIDE_ORDER) do
         if side ~= excludeSide then
-            faceSide(side)
-            local ok, data = turtle[SIDE_INSPECT[side]]()
-            unfaceSide(side)
-            if ok and data and data.name and isChestFn(data.name) then
-                return side
-            end
+            if LoopSetup.isInventory(side) then return side end
         end
     end
     return nil

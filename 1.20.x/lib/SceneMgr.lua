@@ -1,4 +1,4 @@
-local version = 20250914.1600
+version = 20261013.0300
 -- pastebin(1): 9u6ex4YP lib.SceneMgr.lua
 -- pastebin(2): YT0xET0n
 local Class = require("lib.Class")
@@ -97,7 +97,7 @@ end
 function SM:pop()
 	if self.prevSceneName then
 		self:switch(self.prevSceneName)
-		prevSceneName = nil
+		self.prevSceneName = nil
 	end
 end
 

@@ -1,3 +1,4 @@
+version = 20261013.0300
 -- /lib/allowedBlocks.lua
 -- Returns a table with allowed block list and the allowedBlocks() function
 
@@ -70,7 +71,7 @@ function M.allowedBlocks(name)
         "cover",
         "hollow",
         "dust",
-        "powdered",
+        "powder",
         "frame",
         "speleotem",
         "structure",

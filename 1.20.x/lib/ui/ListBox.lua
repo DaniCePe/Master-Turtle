@@ -1,4 +1,4 @@
-local version = 20250913.0900
+version = 20261013.0300
 -- https://pastebin.com/FRGfpRgM lib.ui.ListBox.lua
 local Class = require("lib.Class")
 local Vector2 = require("lib.Vector2")
@@ -60,12 +60,6 @@ end
 
 function ListBox:setToEnd(value)
 	self.toEnd = value
-end
-
-function ListBox:setColours(fg, bg, highlight)
-	self.textColour = fg
-	self.backColour = bg or colors.black
-	self.highlight = highlight or colors.lightGray
 end
 
 function ListBox:move(x, y)
@@ -219,7 +213,7 @@ function ListBox:draw()
 			ListBox.fillDisplayList(self)			-- repopulate displayList, reset dataWidth and dataHeight
 		end
 		if self.toEnd and #self.displayList >= height then
-			for i = #self.displayList - height, height do
+			for i = #self.displayList - height + 1, #self.displayList do
 				row = row + 1
 				lib.display(self, self.displayList[i], row, true)
 			end

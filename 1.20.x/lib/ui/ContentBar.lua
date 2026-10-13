@@ -1,4 +1,4 @@
-local version 	= 20231119.1600
+version = 20261013.0300
 
 local Class = require("lib.Class")
 local Vector2 = require("lib.Vector2")
@@ -21,7 +21,7 @@ function Bar:new(name, x, y, w, h, colours) -- uses button centre as coordinates
 	assert(name ~= nil, "control must have a name")
 	self.name = name
 	self.pos = Vector2(x or 1, y or 1)
-	self.size = Vector2(w or 27, y or 1)
+	self.size = Vector2(w or 27, h or 1)
 	if colours == nil or #colours < 5 then
 		self.colours = {colors.black, colors.gray, colors.lightGray, colors.white, colors.brown}
 	else

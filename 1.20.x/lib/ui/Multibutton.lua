@@ -1,4 +1,4 @@
-local version = 20250914.1200
+version = 20261013.0300
 -- https://pastebin.com/ZzmwzayE lib.ui.MultiButton.lua
 local Button = require("lib.ui.Button")
 --local U = require("lib.TurtleUtils") -- using _G.U loaded in tk
@@ -30,7 +30,6 @@ function MB:new(name, x, y, w, h, text, fg, bg, alignH, alignV, btn, sizes, styl
 	self.styles = styles
 	self.activeFG = activeFG or colors.white
 	self.activeBG = activeBG or colors.orange
-	self.defaultCaption = defaultCaption or ""
 	self.buttons = {}
 	self.buttonCount = 0
 	self.selectedButtonName = ""
@@ -197,12 +196,12 @@ function MB:update(data)
 			local char = data[2]:lower()
 			if char =="h" or char =="i" then
 				local btnIndex = tonumber(U.keyboardInput)
-Log:saveToLog(self.name..":update 'char' = "..char..", U.keyboardInput = "..U.keyboardInput)
+if _G.Log then Log:saveToLog(self.name..":update 'char' = "..char..", U.keyboardInput = "..U.keyboardInput) end
 				if (char == "h" and self.name == "mbHelp") or (char == "i" and self.name == "mbItems") then
 					-- U.keyboardInput is only changed in MainMenu.lua Update
 					if btnIndex ~= nil then
 						U.keyboardInput = ""
-Log:saveToLog(self.name..':update self:setSelectedButton("", '.. btnIndex)
+if _G.Log then Log:saveToLog(self.name..':update self:setSelectedButton("", '.. btnIndex) end
 						self:setSelectedButton("", btnIndex)
 					end
 					-- this function is a global event. Filter in the hosting scene

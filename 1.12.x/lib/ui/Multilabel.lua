@@ -1,4 +1,4 @@
-local version = 20250913.0900
+version = 20261013.0300
 -- https://pastebin.com/i9dprCbT lib.ui.MultiLabel.lua
 local Label = require("lib.ui.Label")
 local ML = Label:derive("MultiLabel")
@@ -35,7 +35,7 @@ function ML:setup(data)
 	-- eg data = {{"stone", 64, 0, true},
 	-- 			 {{"stone (Slab can be crafted)", "slab (Slab can be crafted)"}, {1, 3}, {0, 0}, {false, false}}}
 	-- setup list of labels that have x,y,w,h,text,fg,bg,alignH,alignV
-	Log:saveToLog(self.name.." (MultiLabel):setup")
+	if _G.Log then Log:saveToLog(self.name.." (MultiLabel):setup") end
 	self.labels = {}		-- reset
 	local currentY = self.pos.y
 	local addY = 0
@@ -138,11 +138,13 @@ function ML:update(key, data)
 			break
 		end
 	end
-	dataIndex = 1	-- used to iterate supplied data
-	for k, v in ipairs(self.labels) do -- eg label = {x = 1, y = 1, w = 3, h = 1,  }
-		if v.index == index then
-			v.text = tostring(data[dataIndex])
-			dataIndex = dataIndex + 1
+	local dataIndex = 1	-- used to iterate supplied data
+	for _, row in ipairs(self.labels) do	-- eg row = {{x = 1, y = 1, w = 3, h = 1, index = {1, 1}}, ...}
+		for _, v in ipairs(row) do	-- eg label = {x = 1, y = 1, w = 3, h = 1, index = {1, 1}}
+			if v.index[2] == index then
+				v.text = tostring(data[dataIndex])
+				dataIndex = dataIndex + 1
+			end
 		end
 	end
 end
@@ -190,7 +192,7 @@ function ML:draw()
 								term.write(label.blank)
 							end 
 						end
-					elseif self.alignV == "centre" then
+					elseif label.alignV == "centre" then
 						for row = 0, #drawPositions[label.h] - 1 do	-- eg {"b", "c", "b"}
 							setPos(label.x, label.y + row)
 							if drawPositions[label.h][row + 1] == "b" then

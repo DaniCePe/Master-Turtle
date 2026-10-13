@@ -1,4 +1,4 @@
-local version = 20251003.1700
+version = 20261013.0300
 local Class = require("lib.Class")
 local Vector2 = require("lib.Vector2")
 local C = Class:derive("Checkbox")
@@ -20,6 +20,7 @@ function C:new(index, name, x, y, w, h, text, outlineColour, checkColour, textCo
 	self.pressed = checkColour or colors.red
 	self.disabled = colors.gray
 	self.colour = self.normal
+	self.highlight = self.normal
 	
 	self.textNormal = textColour
 	self.textDisabled = colors.gray
@@ -107,7 +108,7 @@ function C:setText(text)
 end
 
 function C:getChecked()
-	_G.Log:saveToLog("C:getChecked() = ".. tostring(self.checked).." - "..self.name)
+	if _G.Log then _G.Log:saveToLog("C:getChecked() = ".. tostring(self.checked).." - "..self.name) end
 	return self.checked
 end
 
@@ -137,7 +138,7 @@ function C:update(data)
 					--local state = self.checked
 					_G.events:invoke("onChkChanged", self) -- will de-activate all in a group
 					--self.checked = not state
-					Log:saveToLog("Checkbox "..self.name..", clicked: state = "..tostring(self.checked))
+					if _G.Log then Log:saveToLog("Checkbox "..self.name..", clicked: state = "..tostring(self.checked)) end
 					--_G.events:invoke("onChkChanged", self)
 					if self.checked then
 						self.colour = self.highlight

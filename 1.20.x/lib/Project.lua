@@ -1,4 +1,4 @@
-local version = 20250914.1600
+version = 20261013.0300
 -- pastebin(1): 8Ai9Rjwy lib.Project.lua
 -- pastebin(2): edY72046
 local Class = require("lib.Class")
@@ -25,7 +25,7 @@ end
 function P:getItem() return self.item end
 function P:getQuantity() return self.quantity end
 function P:setQuantity(value)	-- set the number of items to be crafted
-	self.quantity = math.ceil(value / self.ratio) * value		-- eg math.ceil(7 / 4)  = 2 * 4 = 8 stairs
+	self.quantity = math.ceil(value / self.ratio) * self.ratio		-- eg math.ceil(7 / 4)  = 2 * 4 = 8 stairs
 	--self.quantityAdjusted = true
 	--P.updateIngredients(self)
 end

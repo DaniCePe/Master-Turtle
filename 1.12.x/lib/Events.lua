@@ -1,4 +1,4 @@
-local version = 20250914.1600
+version = 20261013.0300
 -- pastebin(1): Y0vZ9Zgj lib.Events.lua
 -- pastebin(2):
 local Class = require("lib.Class")
@@ -29,20 +29,6 @@ function Events:new(eventMustExist)
 	self.eventMustExist = (eventMustExist == nil) or eventMustExist
 --Log:saveToLog("Events:new("..tostring(eventMustExist)..")")						-- Events class initialised
 --Log:saveToLog("Events:self.eventMustExist = "..tostring(self.eventMustExist))
-end
-
-function Events.getTraceTable(self, ...)
-	--local args = {...}
-	--local output = textutils.serialize(self.handlers)		-- serialise to json ready to write to file
-	return textutils.serialize(...)		-- serialise to json ready to write to file
-end
-
-function Events.getTraceHandlers(self, eventType)
-	local tbl = self.handlers[eventType]	-- find the handler eg "onChkClick"
-	for i = 1, #tbl do
-		--tbl[i](...)		-- call each handler, passing the list of parameters
-	end
-	return {textutils.serialize(self.handlers[eventType])}		-- serialise to json ready to write to file
 end
 
 --Add new event type

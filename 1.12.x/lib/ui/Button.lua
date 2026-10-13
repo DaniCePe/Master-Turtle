@@ -1,4 +1,4 @@
-local version = 20250914.1200
+version = 20261013.0300
 -- https://pastebin.com/f8SFrLpL lib.ui.Button.lua
 local Class 	= require("lib.Class")
 local Vector2 	= require("lib.Vector2")
@@ -128,14 +128,6 @@ end
 
 function B:setFG(fg)
 	self.textColour = fg
-end
-
-function B:left(x)
-	self.x = x
-end
-
-function B:top(y)
-	self.y = y
 end
 
 function B:enable(enabled)

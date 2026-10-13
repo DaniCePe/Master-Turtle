@@ -1,3 +1,4 @@
+version = 20261013.0300
 -- lib/LoopFuel.lua: quarry-inspired refuel helper for roaming loop programs.
 -- Autonomy rule: never prompts. All choices come from cfg (LoopSetup).
 --
@@ -62,13 +63,13 @@ function LoopFuel.ensure(cfg, minFuel)
     minFuel = minFuel or 0
     local slot = cfg.bucketSlot or 16
     if not cfg.burnFuel then return fuelLevel() >= minFuel end
+    if fuelLevel() >= minFuel then return true end
     local d = turtle.getItemDetail(slot)
     if d and d.name == LAVA_BUCKET then
         turtle.select(slot)
         turtle.refuel(1)
         turtle.select(1)
     end
-    if fuelLevel() >= minFuel then return true end
     local limit = fuelLimit()
     for i = 1, 16 do
         if i ~= slot then

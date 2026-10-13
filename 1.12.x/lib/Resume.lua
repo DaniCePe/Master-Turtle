@@ -1,4 +1,4 @@
-local version = 20261012.1200
+version = 20261013.0300
 -- lib/Resume.lua
 -- Shared resume-from-reboot pattern for long-running turtle programs.
 --

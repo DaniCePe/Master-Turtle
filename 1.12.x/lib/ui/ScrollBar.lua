@@ -1,4 +1,4 @@
-local version = 20250913.0900
+version = 20261013.0300
 -- https://pastebin.com/9bhPj9Kj lib.ui.ScrollBar.lua
 local Class = require("lib.Class")
 local Vector2 = require("lib.Vector2")
@@ -140,7 +140,7 @@ function ScrollBar:setHandle(listbox)
 	else
 		local width = listbox.size.x
 		local listWidth =  listbox.dataWidth
-		if dataWidth == 0 then
+		if listWidth == 0 then
 			self.handleSize.x = self.grooveSize.x - 2			-- update handle size
 			self.handlePos.x  = self.groovePos.x + 1			-- update handle 
 		else
@@ -195,7 +195,6 @@ function ScrollBar:update(data)
 			local mouseClickUp = false
 			local mouseClickDown = false
 			local mouseDrag = false
-			local mouseUp = false
 			local listPos = 1
 			--local clickPos = Vector2(0, 0)
 			local event = data[1]				--"mouse_up", "mouse_click", "mouse_drag"
@@ -269,9 +268,6 @@ function ScrollBar:update(data)
 					--_G.Log:saveToLog("ScrollBar.mouse_drag = true, self.isVertical = "..tostring(self.isVertical))
 					_G.events:invoke("onScrBarDrag", self)
 				end
-			end
-			if event == "mouse_up" then
-				mouseUp = U.mouseOver(data[3], data[4], self.groovePos.x, self.groovePos.y, self.grooveSize.x, self.grooveSize.y)
 			end
 		else
 			self.grooveColour = self.disabled
