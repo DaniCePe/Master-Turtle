@@ -1,3 +1,4 @@
+version = 20261013.1910
 -- Lua 5.2 compat (CC:Tweaked 1.109+): restore the 5.1-isms this program uses when missing.
 if not loadstring then loadstring = load end
 if not unpack then unpack = table.unpack end
@@ -625,6 +626,14 @@ if tArgs["-dim"] then
   local a,b,c = x,y,z
   local num = tArgs["-dim"]
   x = tonumber(tArgs[num + 1]) or x; z = tonumber(tArgs[num + 2]) or z; y = tonumber(tArgs[num + 3]) or y
+  if a ~= x then changedT.new("Length", x) end
+  if c ~= z then changedT.new("Width", z) end
+  if b ~= y then changedT.new("Height", y) end
+elseif tArgs["-length"] or tArgs["-width"] or tArgs["-height"] then
+  local a,b,c = x,y,z
+  if tArgs["-length"] then x = math.floor(math.abs(tonumber(tArgs[tArgs["-length"] + 1]) or x)) end
+  if tArgs["-width"] then z = math.floor(math.abs(tonumber(tArgs[tArgs["-width"] + 1]) or z)) end
+  if tArgs["-height"] then y = math.floor(math.abs(tonumber(tArgs[tArgs["-height"] + 1]) or y)) end
   if a ~= x then changedT.new("Length", x) end
   if c ~= z then changedT.new("Width", z) end
   if b ~= y then changedT.new("Height", y) end
