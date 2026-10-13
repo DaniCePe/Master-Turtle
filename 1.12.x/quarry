@@ -834,9 +834,8 @@ for a,b in pairs(getfenv(1)) do
 end
 toWrite = toWrite.."doCheckFuel = false\n" --It has already used fuel, so calculation unnecessary
 local file
-repeat
-  file = fs.open(saveFile,"w")
-until file
+for _ = 1, 10 do file = fs.open(saveFile, "w") if file then break end sleep(0) end
+if not file then error("Cannot write save file", 0) end
 file.write(toWrite)
 if type(extras) == "table" then
   for a, b in pairs(extras) do
