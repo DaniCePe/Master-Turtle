@@ -1,4 +1,4 @@
-version = 20261013.0300
+version = 20261013.1200
 -- this script fetches "updater.lua" from the github repository
 -- pastebin get piTvMqye installer
 local filename = "updater.lua"
@@ -12,7 +12,9 @@ local base = "https:".."//".."raw.".."githubusercontent.".."com".."/DaniCePe".."
 local tree = "1.20.x"
 local mc = _MC_VERSION or ""
 if mc:find("^1%.12") or (_HOST or ""):find("1%.80") then tree = "1.12.x" end
+term.setTextColor(colors.orange)
 print("Master Turtle installer")
+term.setTextColor(colors.white)
 print("Detected: " .. (_HOST or "?") .. " -> " .. tree .. " tree.")
 io.write("Correct? [Y/n]: ")
 local ans = (read() or ""):lower()
@@ -21,6 +23,33 @@ if ans ~= "" and ans ~= "y" and ans ~= "yes" then
 	local c = read() or ""
 	if c:sub(1, 1) == "1" then tree = "1.12.x" else tree = "1.20.x" end
 end
+
+-- Disk space gate: the tree plus updater staging in tmp/ must fit.
+-- Measured trees: 1.12.x ~1.1 MB, 1.20.x ~1.5 MB. Require 2.5 MB / 3.5 MB
+-- (tree + tmp staging + margin).
+local need = tree == "1.12.x" and 2621440 or 3670016
+local free = fs.getFreeSpace("/") or 0
+if free < need then
+	term.setTextColor(colors.red)
+	print("Not enough disk space. Master Turtle is massive and this turtle's disk limit is too low.")
+	print("")
+	print("To raise the limit, edit .minecraft/config/computercraft-server.toml")
+	print("(on a dedicated server: <server folder>/config/computercraft-server.toml),")
+	print("find the computer_space_limit line and add zeroes to the end of the number:")
+	if tree == "1.12.x" then
+		print("on 1.12.x add TWO zeroes (1000000 becomes 100000000).")
+	else
+		print("on 1.20.x add ONE zero (10000000 becomes 100000000).")
+	end
+	print("")
+	print("Then restart the game and rerun the installer.")
+	term.setTextColor(colors.white)
+	error("Aborted: not enough disk space.", 0)
+end
+
+term.setTextColor(colors.lime)
+print("Disk space check passed. Plenty of room for Master Turtle.")
+term.setTextColor(colors.white)
 
 local url = base .. tree .. "/" .. filename
 
