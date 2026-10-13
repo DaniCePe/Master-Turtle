@@ -1,4 +1,4 @@
-local version = 20261013.1800
+local version = 20261013.2000
 -- scenes/Launcher.lua
 -- Master Turtle main menu: scrollable program list, Run/Quit.
 -- Keyboard: up/down moves, Enter runs, Q quits. Mouse also works.
@@ -33,18 +33,19 @@ function S:new(sceneMgr)
         "MASTER TURTLE", colors.yellow, colors.black, "centre", "centre")
     self.lst = ListBox("lstProg", 2, 3, W - 3, H - 6,
         names, colors.white, colors.black, colors.gray)
-    self.lblDesc = Label("lblDesc", 1, H - 2, W, 1,
-        "", colors.lightGray, colors.black, "left", "centre")
-    self.btnRun = Button("btnRun", 2, H - 1, 10, 1,
+
+    -- Three buttons centered as a group with even gaps.
+    local bw, gap = 10, 2
+    local x0 = math.floor((W - (3 * bw + 2 * gap)) / 2) + 1
+    self.btnRun = Button("btnRun", x0, H - 1, bw, 1,
         "Run", colors.black, colors.lime, "centre", "centre", 0, "", self.name)
-    self.btnInfo = Button("btnInfo", 21, H - 1, 10, 1,
+    self.btnInfo = Button("btnInfo", x0 + bw + gap, H - 1, bw, 1,
         "Info", colors.white, colors.blue, "centre", "centre", 0, "", self.name)
-    self.btnQuit = Button("btnQuit", W - 11, H - 1, 10, 1,
+    self.btnQuit = Button("btnQuit", x0 + 2 * (bw + gap), H - 1, bw, 1,
         "Quit", colors.black, colors.red, "centre", "centre", 0, "q", self.name)
 
     self.em:add(self.lblTitle, "lblTitle")
     self.em:add(self.lst, "lstProg")
-    self.em:add(self.lblDesc, "lblDesc")
     self.em:add(self.btnRun, "btnRun")
     self.em:add(self.btnInfo, "btnInfo")
     self.em:add(self.btnQuit, "btnQuit")
@@ -75,8 +76,6 @@ function S:setSelectedIndex(idx)
     if p then
         self.lst.selectedText = displayName(p)
         self.lst:setHighlightRow(idx)
-        local tag = p.loop and " [runs until stopped]" or ""
-        self.lblDesc:setText(p.desc .. tag)
     end
 end
 

@@ -1,4 +1,4 @@
-version = 20261013.1700
+version = 20261013.2000
 -- blockman: Block Manager
 -- Lists the full effective allowed block list and lets the user add or
 -- remove entries. User additions persist via the CC settings API
@@ -130,6 +130,48 @@ local function doRemove(entries)
     read()
 end
 
+
+-- Read a choice, supporting both keyboard and mouse clicks on [n]ext/[p]rev.
+-- Returns the lowercase choice string.
+local function getChoice(menuRow)
+    local input = ""
+    term.setCursorPos(3, menuRow + 1)
+    term.write("> " .. input)
+    while true do
+        local ev, p1, p2, p3 = os.pullEvent()
+        if ev == "char" then
+            input = input .. p1
+            term.setCursorPos(3, menuRow + 1)
+            term.write("> " .. input .. " ")
+            term.setCursorPos(5 + #input, menuRow + 1)
+        elseif ev == "key" then
+            if p1 == keys.enter then
+                print("")
+                return input:lower()
+            elseif p1 == keys.backspace then
+                if #input > 0 then
+                    input = input:sub(1, -2)
+                    term.setCursorPos(3, menuRow + 1)
+                    term.write("> " .. input .. " ")
+                    term.setCursorPos(5 + #input, menuRow + 1)
+                end
+            end
+        elseif ev == "mouse_click" then
+            -- p2=x, p3=y. Menu: [a]dd  [r]emove  [n]ext  [p]rev  [q]uit
+            -- [n]ext at x 18-23, [p]rev at x 26-31 (1-indexed).
+            if p3 == menuRow then
+                if p2 >= 18 and p2 <= 23 then
+                    print("")
+                    return "n"
+                elseif p2 >= 26 and p2 <= 31 then
+                    print("")
+                    return "p"
+                end
+            end
+        end
+    end
+end
+
 term.clear()
 term.setCursorPos(1, 1)
 print("Block Manager")
@@ -143,9 +185,10 @@ while true do
     while not done do
         local pages
         page, pages = showPage(entries, page)
-        print("[a]dd  [r]emove  [n]ext  [p]rev  [q]uit")
-        io.write("> ")
-        local choice = (read() or ""):lower()
+        print("[a]dd  [r]emove  [n]ext  [p]rev  [q]uit  (click [n]ext/[p]rev)")
+        local _, menuRow = term.getCursorPos()
+        menuRow = menuRow - 1 -- row of the menu line
+        local choice = getChoice(menuRow)
         if choice == "q" then
             done = true
         elseif choice == "a" then

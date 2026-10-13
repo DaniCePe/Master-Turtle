@@ -1,4 +1,4 @@
-local version = 20261013.1900
+local version = 20261013.2000
 -- scenes/Dimensions.lua
 -- Dimension prompt dialog: one row per dimension (label + textbox),
 -- OK builds the command-line args and launches, Cancel goes back.
@@ -32,7 +32,7 @@ function S:enter(program)
         program.name .. ": dimensions", colors.yellow, colors.black,
         "centre", "centre"), "lblDTitle")
     self.em:add(Label("lblDHint", 1, 2, W, 1,
-        "Leave blank to be asked by the program",
+        "Leave blank to be asked by the program (Esc goes back)",
         colors.lightGray, colors.black, "centre", "centre"), "lblDHint")
 
     for i, dim in ipairs(program.dims) do
@@ -157,11 +157,20 @@ end
 
 function S:update(data)
     self.super.update(self, data)
-    if data and data[1] == "key" and data[2] == keys.enter then
-        if self.focusIdx < #self.boxes then
-            self:setFocus(self.focusIdx + 1)
-        else
-            self:tryLaunch()
+    if data and data[1] == "key" then
+        if data[2] == keys.enter then
+            if self.focusIdx < #self.boxes then
+                self:setFocus(self.focusIdx + 1)
+            else
+                self:tryLaunch()
+            end
+        elseif data[2] == keys.esc then
+            -- Esc: back one field, or back to the launcher from the first.
+            if self.focusIdx > 1 then
+                self:setFocus(self.focusIdx - 1)
+            else
+                _G.sm:switch("Launcher")
+            end
         end
     end
 end

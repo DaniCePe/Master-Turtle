@@ -1,4 +1,4 @@
-version = 20261013.1200
+version = 20261013.2000
 -- PLATFORMER v6.0
 -- Date: 2026-10-12
 -- Inspired by Cluster Scanner v4.1 Logic
@@ -29,6 +29,9 @@ local allowedBlocks = allowedLib.allowedBlocks
 local Resume = require("lib.Resume")
 local LoopSetup = require("lib/LoopSetup")
 local LoopFuel = require("lib/LoopFuel")
+
+-- Forward declaration: defined below, used above.
+local totalCells
 
 -- Fuel state: assigned once at startup (or safe defaults on resume).
 local cfg = nil   -- LoopSetup answers (fuel chest side, lava, tags)
@@ -439,7 +442,7 @@ local function shouldPlace(x, z, layer)
     return true -- floor, roof, solid place every cell
 end
 
-local function totalCells()
+totalCells = function()
     local L, W, H = state.params.length, state.params.width, state.params.height
     local perim
     if L == 1 or W == 1 then

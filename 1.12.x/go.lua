@@ -1,4 +1,4 @@
-version = 20261013.0300
+version = 20261013.2000
 --[[
 	Will auto-download clsTurtle.lua
 	Used to move turtle in multiple directions
@@ -54,14 +54,38 @@ function checkLibs(libDir, filename)
 	return fileExists
 end
 
+function showHelp()
+	term.clear()
+	term.setCursorPos(1, 1)
+	print("GO DRIVER - Help")
+	print("")
+	print("Move: f=forward b=back u=up d=down")
+	print("      l=turn left r=turn right")
+	print("  Add a number: f5 = forward 5")
+	print("")
+	print("Actions: s=slot p=place x=dig t=tunnel")
+	print("  s3 = select slot 3")
+	print("  p1 = place forward (0=up 1=fwd 2=down)")
+	print("  x0 = dig up, t5 = tunnel 5 long")
+	print("")
+	print("Keys: h = this help, q = quit")
+	print("  Type a command, Enter to run.")
+	print("  Example: f10, then Enter.")
+	print("")
+	print("Press Enter to continue.")
+	read()
+end
+
 function clear(setCP)
 	term.clear()
 	term.setCursorPos(1, 1)
 	if setCP then
-		term.write("directions: f u d b r l")
+		term.write("GO DRIVER (h=help q=quit)")
 		term.setCursorPos(1, 2)
-		term.write("or: s(lot) p(lace) x(dig) t(unnel)")
+		term.write("Move: f b u d l r + number (f5)")
 		term.setCursorPos(1, 3)
+		term.write("Do: s(slot) p(lace) x(dig) t(unnel)")
+		term.setCursorPos(1, 4)
 	end
 end
 
@@ -80,6 +104,13 @@ function getCommand()
 		if key == keys.q then -- quit
 			cmd = ""
 			break
+		elseif key == keys.h then -- help
+			showHelp()
+			clear(true)
+			term.setCursorPos(1, 4)
+			term.write("cmd?_")
+			col, row = term.getCursorPos()
+			row = row - 1
 		elseif key == keys.s then -- user wants to select slot no
 			cmd = "s"
 			term.setCursorPos(1, row)

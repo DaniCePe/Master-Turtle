@@ -1,4 +1,4 @@
-version = 20261013.1700
+version = 20261013.2000
 -- CROPPER v0.4 BETA (Quarry Edition)
 -- Date: 2026-10-13
 -- Inspired by Civilwargeeky's Quarry & AE2 Cluster Scanner
