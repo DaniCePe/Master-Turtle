@@ -1,4 +1,4 @@
-local version = 20261013.0300
+local version = 20261013.1200
 -- Master Turtle launcher v1.0
 -- Unified GUI menu for every program in the Master Turtle pack.
 -- Built on the Inksaver lib/ui + scenes framework.
@@ -75,6 +75,8 @@ _G.MasterTurtle = {
         { prog = "framer", name = "Framer",
           desc = "Hollow room shell or edge frame",
           dims = { { flag = "-size", label = "Cube size (N)" } } },
+        { prog = "blockman", name = "Block Manager",
+          desc = "View/edit allowed building blocks" },
         { prog = "chopchop", name = "ChopChop",
           desc = "Tree chopper", loop = true },
         { prog = "cranker", name = "Cranker",

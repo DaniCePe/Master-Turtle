@@ -1,0 +1,135 @@
+version = 20261013.1200
+-- blockman: Block Manager
+-- Lists the full effective allowed block list and lets the user add or
+-- remove entries. User additions persist via the CC settings API
+-- (.settings); defaults are fixed and cannot be removed here.
+
+local allowedLib = require("lib.allowedBlocks")
+
+-- Read the user-added table, safely.
+local function userExtra()
+    local ok, extra = pcall(function()
+        return settings.get("MasterTurtle.allowedExtra")
+    end)
+    if ok and type(extra) == "table" then
+        return extra
+    end
+    return {}
+end
+
+local function sortedKeys(t)
+    local keys = {}
+    for k in pairs(t) do
+        keys[#keys + 1] = k
+    end
+    table.sort(keys)
+    return keys
+end
+
+-- Print the numbered effective list; return the entries table.
+local function showList()
+    local entries = {}
+    local n = 0
+    print("Allowed building blocks:")
+    for _, name in ipairs(sortedKeys(allowedLib.allowed)) do
+        n = n + 1
+        entries[n] = { name = name, user = false }
+        print(string.format("  %d. %s", n, name))
+    end
+    for _, name in ipairs(sortedKeys(userExtra())) do
+        if not allowedLib.allowed[name] then
+            n = n + 1
+            entries[n] = { name = name, user = true }
+            print(string.format("  %d. %s  [user]", n, name))
+        end
+    end
+    if n == 0 then
+        print("  (none)")
+    end
+    return entries
+end
+
+local function saveExtra(extra)
+    return pcall(function()
+        settings.set("MasterTurtle.allowedExtra", extra)
+        settings.save()
+    end)
+end
+
+local function doAdd()
+    print("Full item name (e.g. minecraft:granite), or q to cancel:")
+    io.write("> ")
+    local raw = (read() or ""):gsub("^%s+", ""):gsub("%s+$", "")
+    if raw == "" or raw:lower() == "q" then
+        print("Cancelled.")
+        return
+    end
+    local id = raw:lower()
+    if allowedLib.allowed[id] then
+        print(id .. " is already in the defaults.")
+        return
+    end
+    local extra = userExtra()
+    if extra[id] then
+        print(id .. " is already added.")
+        return
+    end
+    extra[id] = true
+    if saveExtra(extra) then
+        print("Added " .. id)
+    else
+        print("Could not save settings.")
+    end
+end
+
+local function doRemove(entries)
+    print("List number to remove (user-added only), or q to cancel:")
+    io.write("> ")
+    local raw = (read() or ""):lower()
+    if raw == "q" or raw == "" then
+        print("Cancelled.")
+        return
+    end
+    local n = tonumber(raw)
+    local entry = n and entries[n]
+    if not entry then
+        print("Not a list number.")
+        return
+    end
+    if not entry.user then
+        print("Defaults are fixed; only user-added entries can be removed.")
+        return
+    end
+    local extra = userExtra()
+    extra[entry.name] = nil
+    if saveExtra(extra) then
+        print("Removed " .. entry.name)
+    else
+        print("Could not save settings.")
+    end
+end
+
+term.clear()
+term.setCursorPos(1, 1)
+print("Block Manager")
+print("Version: " .. version)
+print("")
+
+while true do
+    local entries = showList()
+    print("")
+    print("[a]dd  [r]emove  [q]uit")
+    io.write("> ")
+    local choice = (read() or ""):lower()
+    if choice == "q" then
+        break
+    elseif choice == "a" then
+        doAdd()
+        print("")
+    elseif choice == "r" then
+        doRemove(entries)
+        print("")
+    end
+end
+
+print("Block Manager closed.")

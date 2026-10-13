@@ -1,10 +1,17 @@
-version = 20261013.0300
+version = 20261013.1200
 -- /lib/allowedBlocks.lua
 -- Returns a table with allowed block list and the allowedBlocks() function
 
 local M = {}
 
--- Explicitly allowed blocks (can be extended)
+-- User additions persist through the CC settings API (no stray data files).
+-- pcall-guarded so a missing settings API can never break this lib.
+pcall(function()
+    settings.define("MasterTurtle.allowedExtra",
+        { description = "User-added allowed blocks", type = "table", default = {} })
+end)
+
+-- Explicitly allowed blocks (can be extended via Block Manager)
 M.allowed = {
     -- Basic stones
     ["minecraft:stone"] = true,
@@ -12,7 +19,7 @@ M.allowed = {
     ["minecraft:smooth_stone"] = true,
     ["minecraft:stone_bricks"] = true,
     ["biomesoplenty:dried_sand"] = true,
-    
+
     -- Planks
     ["minecraft:oak_planks"] = true,
     ["minecraft:spruce_planks"] = true,
@@ -36,120 +43,80 @@ M.allowed = {
     ["minecraft:concrete"] = true
 }
 
--- Function to detect allowed blocks
+-- Blocks that are never allowed, whatever the list says
+M.rejectPatterns = {
+    "pane",
+    "stairs",
+    "wall",
+    "fence",
+    "fence_gate",
+    "door",
+    "trapdoor",
+    "pressure_plate",
+    "carpet",
+    "sign",
+    "torch",
+    "ladder",
+    "scaffolding",
+    "slime_block",
+    "honey_block",
+    "kelp$",
+    "root",
+    "sand$",
+    "gravel$",
+    "shard",
+    "piece",
+    "facade",
+    "cover",
+    "hollow",
+    "dust",
+    "powder",
+    "frame",
+    "speleotem",
+    "structure",
+    "dye",
+    "chest",
+    "copycat"
+}
+
+-- Session override for the builders' startup offer.
+-- When a session table is set (lowercase item name -> true), it IS the
+-- list and the static allowlist is skipped. nil restores the static list.
+function M.setSession(set)
+    M.session = set
+end
+
+-- Function to check whether a block is allowed
 function M.allowedBlocks(name)
     if not name then return false end
 
     local id = name:lower()
 
-    ----------------------------------------------------------------
-    -- BLOCK REJECTION
-    ----------------------------------------------------------------
-    local rejectPatterns = {
-        "pane",
-        "stairs",
-        "wall",
-        "fence",
-        "fence_gate",
-        "door",
-        "trapdoor",
-        "pressure_plate",
-        "carpet",
-        "sign",
-        "torch",
-        "ladder",
-        "scaffolding",
-        "slime_block",
-        "honey_block",
-        "kelp$",
-        "root",
-        "sand$",
-        "gravel$",
-        "shard",
-        "piece",
-        "facade",
-        "cover",
-        "hollow",
-        "dust",
-        "powder",
-        "frame",
-        "speleotem",
-        "structure",
-        "dye",
-        "chest",
-        "copycat"
-    }
+    -- Session override: the session table replaces the static list.
+    if M.session then
+        return M.session[id] == true
+    end
 
-    for _, pat in ipairs(rejectPatterns) do
+    -- Explicit allowlist first: the owner's curated list wins outright
+    -- (e.g. biomesoplenty:dried_sand is allowed despite ending in "sand").
+    if M.allowed[id] then
+        return true
+    end
+
+    -- Reject patterns guard everything else, including user additions.
+    for _, pat in ipairs(M.rejectPatterns) do
         if id:find(pat) then
             return false
         end
     end
 
-    ----------------------------------------------------------------
-    -- EXPLICIT ALLOWLIST
-    ----------------------------------------------------------------
-    if M.allowed[id] then
+    -- User additions from the settings API
+    local ok, extra = pcall(function()
+        return settings.get("MasterTurtle.allowedExtra")
+    end)
+    if ok and type(extra) == "table" and extra[id] then
         return true
     end
-
-    ----------------------------------------------------------------
-    -- AUTO-DETECTION FOR FULL BLOCK TYPES
-    ----------------------------------------------------------------
-
-    -- Saplings / propagules (requested)
-    if id:find("sapling") then return true end
-    if id:find("propagule") then return true end
-
-    -- Planks
-    if id:find("planks") then return true end
-
-    -- Logs & stems
-    if id:find("log") or id:find("stem") then return true end
-
-    -- Leaves
-    if id:find("leaves") then return true end
-
-    -- Slabs
-    if id:find("slab") then return true end
-
-    -- Buttons
-    if id:find("button") then return true end
-
-    -- Stone & stone-like
-    if (id:find("stone") and not id:find("redstone")) or
-       id:find("granite") or id:find("andesite") or id:find("diorite") or
-       id:find("tuff") or id:find("deepslate") or
-       id:find("basalt") or id:find("blackstone") then
-        return true
-    end
-
-    -- Glass
-    if id:find("glass") then return true end
-
-    -- Full kelp blocks
-    if id:find("kelp") and id:find("block") then return true end
-
-    -- Bricks & variants
-    if id:find("brick") then return true end
-
-    -- Terracotta & variants
-    if id:find("terracotta") then return true end
-
-    -- Sandstone variants
-    if id:find("sandstone") then return true end
-
-    -- Wool
-    if id:find("wool") then return true end
-
-    -- Concrete
-    if id:find("concrete") then return true end
-
-    -- Quartz
-    if id:find("quartz") then return true end
-
-    -- Dirt & grass
-    if id:find("dirt") or id:find("grass") then return true end
 
     return false
 end
