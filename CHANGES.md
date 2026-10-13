@@ -55,6 +55,10 @@ cost no fuel. chopchop and cranker are untouched.
   right-clicks the turtle (opening its menu) and pause all movement and
   actions until the menu closes, giving the user a chance to stop the
   turtle before it leaves reach. Feasibility not yet confirmed.
+- Retro tree: Daniel loves MC 1.5.2 and 1.6.x (a favorite seed). Plan is
+  a "lite" pack for those versions first (no item-name features: no tag
+  system, no fuel-by-name; getItemDetail/inspect need CC 1.64+), then a
+  full clone later. 1.7.10/1.8.x would be the full-feature retro tree.
 
 ## v1.1 (2026-10-12): Daniel's answers round 1
 
