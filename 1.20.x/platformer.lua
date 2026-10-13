@@ -2,7 +2,7 @@
 -- Date: 2026-10-12
 -- Inspired by Cluster Scanner v4.1 Logic
 -- v6.1 Changes:
---   - Roof mode rework (Daniel's spec): start at any level, ascend N
+--   - Roof mode rework: start at any level, ascend N
 --     blocks, lay one flat LxW layer, descend back. Inverted roof
 --     places the ceiling upward from the start level, no climbing.
 -- v6.0 Changes:
@@ -420,7 +420,7 @@ local function doSnakeLayer(layer)
 end
 
 local function buildRoof()
-    -- Roof spec (Daniel): start at ANY level. Non-inverted: ascend
+    -- Roof spec: start at ANY level. Non-inverted: ascend
     -- height-up blocks, lay one flat LxW layer, descend back to the
     -- start level. Inverted: place the ceiling upward from the start
     -- level, no climbing. Every step is resume-aware via state.y

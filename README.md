@@ -1,7 +1,8 @@
 # Master Turtle
 
-A unified turtle program pack for ComputerCraft / CC:Tweaked: Daniel's
-turtle programs plus Inksaver's GUI toolkit, behind one launcher menu,
+A unified turtle program pack for ComputerCraft / CC:Tweaked, combining
+a private turtle program collection with Inksaver's GUI toolkit, behind
+one launcher menu,
 with crash-proof resume on the long runners and an updater that pulls
 from this repo.
 
@@ -71,7 +72,7 @@ You can also run any program directly from the shell, e.g.
 ### Quarry
 
 `quarry`: the massive variable-size quarry (civilwargeeky's lineage,
-Daniel's working copy v3.6.4.5). Digs a rectangular pit, sorts ores,
+working copy v3.6.4.5). Digs a rectangular pit, sorts ores,
 returns home when done or when out of fuel.
 
 Dimensions: `-dim [length] [width] [height]`, e.g.
@@ -215,7 +216,7 @@ release to pull the latest.
 Long runners save progress so a reboot or crash does not lose work:
 
 - `quarry`: `Civil_Quarry_Restore` (full state snapshot; the crown
-  jewel, preserved exactly as Daniel had it). Resume with
+  jewel, preserved exactly as shipped). Resume with
   `quarry -resume`, or let the `startup` stub do it on boot.
 - `platformer`: `.platformer_restore` (per-layer progress).
 - `filler`: `.filler_restore`. `cropper`: `.cropper_restore`.

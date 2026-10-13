@@ -1,6 +1,6 @@
 # Master Turtle: what changed from the zip
 
-This pack unifies Daniel's `MasterTurtle.zip` (his programs plus
+This pack unifies a private `MasterTurtle.zip` (turtle programs plus
 Inksaver's toolkit) into a public repo with a launcher, an updater, and
 two version trees. Everything below is relative to the zip contents.
 
@@ -55,17 +55,17 @@ cost no fuel. chopchop and cranker are untouched.
   right-clicks the turtle (opening its menu) and pause all movement and
   actions until the menu closes, giving the user a chance to stop the
   turtle before it leaves reach. Feasibility not yet confirmed.
-- Retro tree: Daniel loves MC 1.5.2 and 1.6.x (a favorite seed). Plan is
+- Retro tree: MC 1.5.2 and 1.6.x are wanted for a favorite seed. Plan is
   a "lite" pack for those versions first (no item-name features: no tag
   system, no fuel-by-name; getItemDetail/inspect need CC 1.64+), then a
   full clone later. 1.7.10/1.8.x would be the full-feature retro tree.
 
-## v1.1 (2026-10-12): Daniel's answers round 1
+## v1.1 (2026-10-12): round 1 answers
 
 - `os.epoch("utc")` in the cc-ai client: verified empirically under
   ComputerCraft 1.80pr1 (the 1.12.x target) via CCEmuX; it exists and
   returns a millisecond timestamp. No fallback needed, nothing changed.
-- Platformer roof mode reworked to Daniel's spec (v6.1): start at any
+- Platformer roof mode reworked (v6.1): start at any
   level, give `-height N` as blocks-up, the turtle ascends N blocks,
   lays one flat LxW roof, descends back to its start level (stepping
   off the footprint first so it never digs through its own roof).
@@ -127,8 +127,8 @@ cost no fuel. chopchop and cranker are untouched.
   `getItemsForInventory` (in `tk3.lua`).
 - 21 more `T:` methods in `lib/clsTurtle.lua` also have zero call sites
   (`setY`, `setZ`, `getCoords`, `getTotalItemCount`, `isAdvanced`,
-  `getInventoryData`, etc.) but they look like public API Daniel may
-  call interactively, so they were kept. List available on request.
+  `getInventoryData`, etc.) but they look like public API that may be
+  called interactively, so they were kept. List available on request.
 
 ## Fixed
 
@@ -152,7 +152,7 @@ cost no fuel. chopchop and cranker are untouched.
 - `updater.lua` manifest now covers every shipped file, including the
   new `master.lua`, `startup.lua`, `move`/`turn`, `cc-ai`,
   `lib/Resume.lua`, `lib/allowedBlocks.lua`, `data.lua`, and the new
-  scenes. Daniel's extensionless programs (`attack`, `buckRef`,
+  scenes. The extensionless programs (`attack`, `buckRef`,
   `framer`, `trump`, `vacuum`) got `version =` headers so the updater's
   version check actually updates them. The quarry (third-party) is
   install-if-missing only, never modified.

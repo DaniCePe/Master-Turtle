@@ -14,7 +14,7 @@ local version = 20261012.1200
 --      and restored when the program finishes.
 --
 -- Pattern origin: civilwargeeky's Variable Size Quarry (global-env
--- snapshot + event replay) proved the concept; Daniel's long runners
+-- snapshot + event replay) proved the concept; this pack's long runners
 -- (platformer, filler, cropper, cluster) converged on the simpler
 -- state-table variant generalized here. The quarry itself is NOT
 -- rewired to this library: its global-snapshot mechanism is load-bearing
