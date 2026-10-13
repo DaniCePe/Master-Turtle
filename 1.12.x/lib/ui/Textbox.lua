@@ -1,4 +1,4 @@
-local version = 20250913.0900
+local version = 20261013.1845
 -- https://pastebin.com/awnymvaT lib.ui.Textbox.lua
 local Class = require("lib.Class")
 local T = Class:derive("Textbox")
