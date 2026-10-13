@@ -1,4 +1,4 @@
-version = 20261013.1200
+version = 20261013.1840
 --[[
 	Last edited: see version YYYYMMDD.HHMM
 	Master Turtle pack installer/updater.
@@ -349,7 +349,7 @@ function main()
 	log("\nOperation Complete ")
 	log(updated.." files updated")
 
-	print("See update.log for details")
+	print("See update.log for details (edit update.log to view)")
 end
 
 main()
