@@ -1,3 +1,4 @@
+version = 20261013.0300
 -- CROPPER v0.4 BETA (Quarry Edition)
 -- Date: 2026-10-13
 -- Inspired by Civilwargeeky's Quarry & AE2 Cluster Scanner
@@ -129,7 +130,8 @@ local function loadProgress()
     local data = Resume.load(RESTORE_FILE)
     if data then
         state = data
-            if not state.params.waitTime then state.params.waitTime = 0 end
+        state.params = state.params or { length = 0, width = 0, waitTime = 0 }
+        if not state.params.waitTime then state.params.waitTime = 0 end
         return true
     end
     return false
@@ -190,12 +192,12 @@ end
 local function forward()
     while not turtle.forward() do
         if turtle.getFuelLevel() == 0 then
-            -- Out of fuel: burn tagged fuel or use the bucket instead of
-            -- spinning forever.
+            -- Out of fuel: burn tagged fuel or use the bucket. If that
+            -- fails too, stop (progress is saved by the error handler).
             if not LoopFuel.ensure(cfg, minFuel) then
                 log("Out of fuel at "..state.x..","..state.z)
                 colorPrint("OUT OF FUEL", colors.red)
-                sleep(1)
+                error("Terminated", 0)
             end
         else
             turtle.dig(); turtle.attack()
@@ -232,6 +234,14 @@ local crops = {
     modded = {}
 }
 
+-- Mature age per crop: beetroots finish at 3, the rest at 7.
+local maxAge = {
+    ["minecraft:wheat"] = 7,
+    ["minecraft:carrots"] = 7,
+    ["minecraft:potatoes"] = 7,
+    ["minecraft:beetroots"] = 3,
+}
+
 local seeds = {
     vanilla = {
         ["minecraft:wheat"] = "minecraft:wheat_seeds",
@@ -241,6 +251,16 @@ local seeds = {
     },
     modded = {}
 }
+
+-- Seed item names: the storage dump skips these so replanting keeps working.
+local seedItems = {}
+for _, seed in pairs(seeds.vanilla) do seedItems[seed] = true end
+for _, seed in pairs(seeds.modded) do seedItems[seed] = true end
+
+local function isSeedSlot(slot)
+    local d = turtle.getItemDetail(slot)
+    return d and d.name and seedItems[d.name]
+end
 
 local function seedForCrop(name)
     return seeds.vanilla[name] or seeds.modded[name]
@@ -259,7 +279,7 @@ local function harvestAndReplant()
     local exists, info = turtle.inspectDown()
     if not exists then return end
     
-    if (crops.vanilla[info.name] or crops.modded[info.name]) and info.state and info.state.age and info.state.age >= 7 then
+    if (crops.vanilla[info.name] or crops.modded[info.name]) and info.state and info.state.age and info.state.age >= (maxAge[info.name] or 7) then
         log("Harvesting "..info.name.." at "..state.x..","..state.z)
         turtle.digDown()
         
@@ -274,11 +294,6 @@ local function harvestAndReplant()
     end
 end
 
-local function isStorage(name)
-    if not name then return false end
-    return name:find("chest") or name:find("barrel") or name:find("shulker")
-end
-
 local function checkInventory()
     local count = 0
     for i=1,16 do if turtle.getItemCount(i) > 0 then count = count + 1 end end
@@ -288,11 +303,13 @@ local function checkInventory()
         log("Inventory full at "..state.x..","..state.z)
     end
     
-    -- Opportunistic dump (fuel/bucket slot excluded)
+    -- Opportunistic dump (fuel/bucket slot and seed stock excluded)
     local has, data = turtle.inspectDown()
-    if has and isStorage(data.name) then
+    if has and LoopSetup.isInventory("bottom") then
         for i=1,16 do
-            if i ~= cfg.bucketSlot then turtle.select(i); turtle.dropDown() end
+            if i ~= cfg.bucketSlot and not isSeedSlot(i) then
+                turtle.select(i); turtle.dropDown()
+            end
         end
         turtle.select(1)
         state.inventoryFull = false
@@ -464,6 +481,11 @@ end
 
 -- Enough fuel for a full cycle plus the trip home, capped at the limit.
 minFuel = LoopFuel.capEst(2 * state.params.length * state.params.width + 10)
+
+if not LoopFuel.ensure(cfg, minFuel) then
+    print("Not enough fuel to start.")
+    return
+end
 
 while true do
     local ok, err = pcall(runScan)

@@ -1,3 +1,4 @@
+version = 20261013.0300
 -- INFINITE MINER v5.1
 -- Mines forever, listens for Q (or Ctrl+T) to stop, auto-dumps generable
 -- blocks into chests and everything else to your dump side.
@@ -38,10 +39,6 @@ local function isGenerable(i)
     return detail and detail.name and GENERABLE[detail.name]
 end
 
-local function isChestName(name)
-    return name and name:find("chest")
-end
-
 -- Sorted dump: non-generable clutter goes to the dump side (plain drop,
 -- front is never offered as the dump side since that is the mining face);
 -- generable blocks go to the auto-detected chest. The dump side is
@@ -53,13 +50,20 @@ local function dumpSorted()
             return detail and detail.name and not GENERABLE[detail.name]
         end)
     end
-    local chestSide = LoopSetup.findSide(isChestName, cfg.dumpSide)
-    if not chestSide then return false end
+    local chestSide = LoopSetup.findInventory(cfg.dumpSide)
+    if not chestSide then
+        -- Only stranded generable blocks count as a failure: the
+        -- dump-side pass may already have cleared everything else.
+        for i = 1, 16 do
+            if isGenerable(i) then return false end
+        end
+        return true
+    end
     LoopSetup.dropToward(chestSide, isGenerable)
     return true
 end
 
--- returns TRUE if dump succeeded, FALSE if no chest found
+-- returns TRUE if dump succeeded, FALSE if generable blocks are stranded
 local function dumpToChest()
     return dumpSorted()
 end
@@ -134,12 +138,12 @@ end
 -- Program start
 -------------------------
 print("actually mine forever?")
-local ans = read():lower()
+local ans = (read() or ""):lower()
 
 while ans ~= "yes" and ans ~= "y" and ans ~= "yey"
   and ans ~= "no" and ans ~= "n" and ans ~= "nay" do
     print("wym. it's a yey or nay question.")
-    ans = read():lower()
+    ans = (read() or ""):lower()
 end
 
 if ans == "no" or ans == "n" or ans == "nay" then

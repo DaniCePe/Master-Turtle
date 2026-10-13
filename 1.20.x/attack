@@ -1,4 +1,4 @@
-version = 20261013.1200
+version = 20261013.0300
 -- Attacker v2.2 (CC:Tweaked)
 -- Features:
 --  * Continuous attacks forward
@@ -102,10 +102,6 @@ local function occupiedSlots()
     return count
 end
 
-local function isChestName(name)
-    return name and string.find(name, "chest")
-end
-
 local function isTrash(i)
     local d = turtle.getItemDetail(i)
     return d and d.name and #(cfg.trashTags or {}) > 0
@@ -120,8 +116,16 @@ local function dumpSorted()
     if cfg.trashSide ~= "none" and #(cfg.trashTags or {}) > 0 then
         LoopSetup.dropToward(cfg.trashSide, isTrash)
     end
-    local chestSide = LoopSetup.findSide(isChestName, cfg.trashSide)
-    if not chestSide then return false end
+    local chestSide = LoopSetup.findInventory(cfg.trashSide)
+    if not chestSide then
+        -- No inventory found, but only report it when something is
+        -- actually stranded: the trash pass may already have cleared
+        -- every non-trash item.
+        for i = 1, 16 do
+            if turtle.getItemCount(i) > 0 and not isTrash(i) then return false end
+        end
+        return true
+    end
     LoopSetup.dropToward(chestSide, function(i)
         return turtle.getItemCount(i) > 0 and not isTrash(i)
     end)

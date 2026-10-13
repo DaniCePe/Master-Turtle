@@ -1,3 +1,4 @@
+version = 20261013.0300
 -- AE2 QUARTZ CLUSTER SCANNER v4.3 (Quarry Edition)
 -- Date: 2026-10-13
 -- Inspired by Civilwargeeky's Quarry
@@ -165,7 +166,8 @@ local function loadProgress()
     local data = Resume.load(RESTORE_FILE)
     if data then
         state = data
-            if not state.params.waitTime then state.params.waitTime = 0 end
+        state.params = state.params or { length = 0, width = 0, waitTime = 0 }
+        if not state.params.waitTime then state.params.waitTime = 0 end
         return true
     end
     return false
@@ -208,12 +210,12 @@ local function forward()
     while not turtle.forward() do
         -- Blocked? Dig? Attack? Refuel?
         if turtle.getFuelLevel() == 0 then
-            -- Out of fuel: burn tagged fuel or use the bucket instead of
-            -- spinning forever.
+            -- Out of fuel: burn tagged fuel or use the bucket. If that
+            -- fails too, stop (progress is saved by the error handler).
             if not LoopFuel.ensure(cfg, minFuel) then
                 log("Out of fuel at "..state.x..","..state.z)
                 colorPrint("OUT OF FUEL", colors.red)
-                sleep(1)
+                error("Terminated", 0)
             end
         else
             turtle.dig()
@@ -268,11 +270,6 @@ local function scanCluster()
     end
 end
 
-local function isStorage(name)
-    if not name then return false end
-    return name:find("chest") or name:find("barrel") or name:find("shulker")
-end
-
 local function checkInventory()
     -- Check if full
     local count = 0
@@ -289,7 +286,7 @@ local function checkInventory()
     
     -- Opportunistic dump (fuel/bucket slot excluded)
     local has, data = turtle.inspectDown()
-    if has and isStorage(data.name) then
+    if has and LoopSetup.isInventory("bottom") then
         for i=1,16 do
             if i ~= cfg.bucketSlot then turtle.select(i); turtle.dropDown() end
         end
@@ -477,6 +474,11 @@ end
 
 -- Enough fuel for a full cycle plus the trip home, capped at the limit.
 minFuel = LoopFuel.capEst(2 * state.params.length * state.params.width + 10)
+
+if not LoopFuel.ensure(cfg, minFuel) then
+    print("Not enough fuel to start.")
+    return
+end
 
 -- Main Loop
 while true do

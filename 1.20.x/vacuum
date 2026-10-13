@@ -1,4 +1,4 @@
-version = 20261013.1200
+version = 20261013.0300
 -- VACUUM SWEEPER v1.1
 -- Snake sweeps L x W, sucks floor items, dumps into chests below.
 -- Checks below for a chest on every cell; refuels from tagged fuel
@@ -47,9 +47,11 @@ end
 local function forwardSafe()
     while not turtle.forward() do
         if turtle.getFuelLevel() == 0 then
-            -- Out of fuel: burn tagged fuel or use the bucket instead of
-            -- digging at nothing forever.
-            LoopFuel.ensure(cfg, minFuel)
+            -- Out of fuel: burn tagged fuel or use the bucket. If that
+            -- fails too, stop instead of retrying forever at 0 fuel.
+            if not LoopFuel.ensure(cfg, minFuel) then
+                error("OutOfFuel", 0)
+            end
         else
             turtle.dig()
             turtle.attack()
@@ -93,11 +95,6 @@ local function suckAll()
     turtle.suckDown()
 end
 
-local function isChest(name)
-    if not name then return false end
-    return string.find(name, "chest") or string.find(name, "barrel")
-end
-
 -- The fuel/bucket slot is never dumped.
 local function dumpAllDown()
     for s=1,16 do
@@ -114,7 +111,7 @@ end
 local function cellCheck()
     local has, data = turtle.inspectDown()
     if not has or not data or not data.name then return end
-    if isChest(data.name) then
+    if LoopSetup.isInventory("bottom") then
         dumpAllDown()
         LoopFuel.stage(cfg)
     elseif cfg.lavaUnder and data.name:find("lava") then
@@ -190,6 +187,11 @@ minFuel = LoopFuel.capEst(2 * L * W + 10)
 colorPrint("Press ENTER to start. Press Q (or Ctrl+T) to stop.", colors.green)
 read()
 
+if not LoopFuel.ensure(cfg, minFuel) then
+    print("Not enough fuel to start.")
+    return
+end
+
 local stop = false
 local function watch()
     while true do
@@ -201,15 +203,24 @@ end
 local startDir = dir
 
 local function run()
-    while not stop do
-        path = {}
-        x, z = 0,0
-        dir = startDir
-        sweep(L, W)
-        returnHome(startDir)
-        -- Back at start facing the start direction: refill the bucket
-        -- from the stated lava side when possible.
-        LoopFuel.fillAtStart(cfg)
+    local ok, err = pcall(function()
+        while not stop do
+            path = {}
+            x, z = 0,0
+            dir = startDir
+            sweep(L, W)
+            returnHome(startDir)
+            -- Back at start facing the start direction: refill the bucket
+            -- from the stated lava side when possible.
+            LoopFuel.fillAtStart(cfg)
+        end
+    end)
+    if not ok then
+        if err == "OutOfFuel" then
+            print("Out of fuel. Stopping.")
+        else
+            error(err, 0)
+        end
     end
 end
 
