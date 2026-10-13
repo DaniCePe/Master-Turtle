@@ -1,8 +1,19 @@
--- INFINITE MINER v5.0
--- Mines forever, listens for Enter to stop, auto-dumps 4+ stacks into chests.
+-- INFINITE MINER v5.1
+-- Mines forever, listens for Q (or Ctrl+T) to stop, auto-dumps generable
+-- blocks into chests and everything else to your dump side.
 -- Stops safely if no chest is found ("constipated mode")
 
+local LoopSetup = require("lib.LoopSetup")
+local cfg = LoopSetup.defaults()
+
 local COBBLE = "minecraft:cobblestone"
+-- Blocks generable from water/lava combos: these go to the chest.
+local GENERABLE = {
+    ["minecraft:cobblestone"] = true,
+    ["minecraft:stone"] = true,
+    ["minecraft:basalt"] = true,
+    ["minecraft:obsidian"] = true,
+}
 local mined = 0
 local stopFlag = false
 
@@ -16,55 +27,41 @@ local function drawUI()
     print("=       Mining...      =")
     print("========================")
     print("Blocks mined: "..mined)
-    write("press enter to stop. > ")
+    write("press Q (or Ctrl+T) to stop. > ")
 end
 
 -------------------------
 --  Chest dump helpers
 -------------------------
-local function tryDump(inspectFunc, dropFunc)
-    local ok, data = inspectFunc()
-    if ok and data.name and data.name:find("chest") then
-        for i=1,16 do
+local function isGenerable(i)
+    local detail = turtle.getItemDetail(i)
+    return detail and detail.name and GENERABLE[detail.name]
+end
+
+local function isChestName(name)
+    return name and name:find("chest")
+end
+
+-- Sorted dump: non-generable clutter goes to the dump side (plain drop,
+-- front is never offered as the dump side since that is the mining face);
+-- generable blocks go to the auto-detected chest. The dump side is
+-- excluded from chest detection for this run.
+local function dumpSorted()
+    if cfg.dumpSide ~= "none" then
+        LoopSetup.dropToward(cfg.dumpSide, function(i)
             local detail = turtle.getItemDetail(i)
-            if detail and detail.name == COBBLE then
-                turtle.select(i)
-                dropFunc()
-            end
-        end
-        turtle.select(1)
-        print("\nDumped in chest. Back to work ig")
-        sleep(1)
-        return true
+            return detail and detail.name and not GENERABLE[detail.name]
+        end)
     end
-    return false
+    local chestSide = LoopSetup.findSide(isChestName, cfg.dumpSide)
+    if not chestSide then return false end
+    LoopSetup.dropToward(chestSide, isGenerable)
+    return true
 end
 
 -- returns TRUE if dump succeeded, FALSE if no chest found
 local function dumpToChest()
-    -- forward
-    if tryDump(turtle.inspect, turtle.drop) then return true end
-    -- up
-    if tryDump(turtle.inspectUp, turtle.dropUp) then return true end
-    -- down
-    if tryDump(turtle.inspectDown, turtle.dropDown) then return true end
-
-    -- left
-    turtle.turnLeft()
-    if tryDump(turtle.inspect, turtle.drop) then turtle.turnRight() return true end
-
-    -- right
-    turtle.turnRight(); turtle.turnRight()
-    if tryDump(turtle.inspect, turtle.drop) then
-        turtle.turnLeft()
-        return true
-    end
-
-    -- restore facing
-    turtle.turnLeft()
-
-    -- none found
-    return false
+    return dumpSorted()
 end
 
 local function getCobbleCount()
@@ -76,6 +73,14 @@ local function getCobbleCount()
         end
     end
     return total
+end
+
+local function occupiedSlots()
+    local count = 0
+    for i=1,16 do
+        if turtle.getItemCount(i) > 0 then count = count + 1 end
+    end
+    return count
 end
 
 -------------------------
@@ -94,8 +99,8 @@ local function miningLoop()
             end
         end
 
-        -- inventory threshold
-        if getCobbleCount() >= 256 then
+        -- inventory threshold: 256 cobble, or nearly full of clutter
+        if getCobbleCount() >= 256 or occupiedSlots() >= 14 then
             print("\nHold it... gotta 'take a dump.'")
             sleep(1)
 
@@ -116,8 +121,8 @@ end
 -------------------------
 local function stopListener()
     while true do
-        local event, key = os.pullEvent("key")
-        if key == keys.enter then
+        local ev, key = os.pullEvent()
+        if ev == "terminate" or (ev == "key" and (key == keys.q or key == keys.enter)) then
             stopFlag = true
             print("\nOk fine, stopping. But because I wanted to.")
             return
@@ -141,6 +146,17 @@ if ans == "no" or ans == "n" or ans == "nay" then
     print("then why u calling me??")
     return
 end
+
+local scfg = LoopSetup.run({
+    blurb = "Mines cobblestone ahead forever. Generable blocks go to a detected chest; anything else goes to your dump side.",
+    dumpSide = true,
+    noFront = true,
+})
+if not scfg then
+    print("Setup aborted.")
+    return
+end
+cfg = scfg
 
 -- Run mining + key listener together
 parallel.waitForAny(miningLoop, stopListener)

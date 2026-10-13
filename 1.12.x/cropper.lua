@@ -1,6 +1,14 @@
--- CROPPER v0.3 BETA (Quarry Edition)
--- Date: 2025-12-13
+-- CROPPER v0.4 BETA (Quarry Edition)
+-- Date: 2026-10-13
 -- Inspired by Civilwargeeky's Quarry & AE2 Cluster Scanner
+-- v0.4 Changes:
+--   - Starter prompt (lib/LoopSetup): fuel questions answered once.
+--   - Refuel: burns tagged fuel found while working, or a lava bucket
+--     in slot 16 (lava side at start, or lava below while traveling),
+--     instead of spinning forever at 0 fuel.
+--   - Dump excludes the fuel/bucket slot; found fuel is staged there.
+--   - Stop now SAVES progress (like the cluster scanner) instead of
+--     wiping the session; single Q press or Ctrl+T.
 -- v0.3 Changes:
 --   - Full Quarry Logic: CLI Args (-length, -width, -wait).
 --   - Persistence: Resumes exactly where left off.
@@ -9,7 +17,7 @@
 --   - Strict Cleanup: Q to Abort deletes all temp files (logs, startup, restore).
 --   - Farming: Harvests mature crops (age >= 7) and replants.
 
-local VERSION = "0.3 Beta"
+local VERSION = "0.4 Beta"
 local RESTORE_FILE = ".cropper_restore"
 local LOG_FILE = "cropper_log.txt"
 local LOG_DIR = "Cropper_Logs"
@@ -21,6 +29,10 @@ local cluster_backup = "startup_old_cropper"
 --------------------------------------
 local tArgs = { ... }
 local Resume = require("lib.Resume")
+local LoopSetup = require("lib.LoopSetup")
+local LoopFuel = require("lib.LoopFuel")
+local cfg = LoopSetup.defaults()
+local minFuel = 0
 local params = {
     length = 0,
     width = 0,
@@ -78,7 +90,7 @@ local function drawUI()
         colorPrint(fuel.." / "..fuelMax, colors.green)
     end
     
-    colorPrint("Press Q 3 sec to Terminate", colors.red)
+    colorPrint("Press Q (or Ctrl+T) to stop; progress is saved", colors.red)
 
     if state.isReturning then
         colorPrint(">> RETURNING TO START <<", colors.orange)
@@ -178,9 +190,13 @@ end
 local function forward()
     while not turtle.forward() do
         if turtle.getFuelLevel() == 0 then
-            log("Out of fuel at "..state.x..","..state.z)
-            colorPrint("OUT OF FUEL", colors.red)
-            sleep(1)
+            -- Out of fuel: burn tagged fuel or use the bucket instead of
+            -- spinning forever.
+            if not LoopFuel.ensure(cfg, minFuel) then
+                log("Out of fuel at "..state.x..","..state.z)
+                colorPrint("OUT OF FUEL", colors.red)
+                sleep(1)
+            end
         else
             turtle.dig(); turtle.attack()
         end
@@ -272,13 +288,19 @@ local function checkInventory()
         log("Inventory full at "..state.x..","..state.z)
     end
     
-    -- Opportunistic dump
+    -- Opportunistic dump (fuel/bucket slot excluded)
     local has, data = turtle.inspectDown()
     if has and isStorage(data.name) then
-        for i=1,16 do turtle.select(i); turtle.dropDown() end
+        for i=1,16 do
+            if i ~= cfg.bucketSlot then turtle.select(i); turtle.dropDown() end
+        end
         turtle.select(1)
         state.inventoryFull = false
+        LoopFuel.stage(cfg)
         log("Dumped items into storage at "..state.x..","..state.z)
+    elseif has and cfg.lavaUnder and data.name:find("lava") then
+        -- Lava below while traveling: fill the bucket when possible.
+        LoopFuel.fillFrom(turtle.inspectDown, turtle.placeDown, cfg)
     end
 end
 
@@ -346,6 +368,9 @@ local function scanLogic()
     state.isReturning = true
     goTo(0,0)
     turnTo(0)
+    -- Back at start facing the start direction: refill the bucket from
+    -- the stated lava side when possible.
+    LoopFuel.fillAtStart(cfg)
     
     state.cycleCount = state.cycleCount + 1
     logRunSummary()
@@ -363,18 +388,9 @@ local function scanLogic()
 end
 
 local function listenForExit()
-    local timer
-    local holding = false
     while true do
         local ev, p1 = os.pullEvent()
-        if ev == "key" and p1 == keys.q then
-            if not holding then
-                holding = true
-                timer = os.startTimer(3)
-            end
-        elseif ev == "key_up" and p1 == keys.q then
-            holding = false
-        elseif ev == "timer" and p1 == timer and holding then
+        if ev == "terminate" or (ev == "key" and (p1 == keys.q or p1 == keys.enter)) then
             error("Terminated", 0)
         end
     end
@@ -415,7 +431,10 @@ local function promptStart(resume)
     end
 end
 
-if loadProgress() then promptStart(true) end
+if loadProgress() then
+    if state.setup then cfg = state.setup end
+    promptStart(true)
+end
 
 if state.x == 0 and state.z == 0 and state.cycleCount == 0 then
     if #tArgs > 0 then parseArgs() else getArgsInteractive() end
@@ -423,19 +442,36 @@ if state.x == 0 and state.z == 0 and state.cycleCount == 0 then
         colorPrint("Invalid arguments.", colors.red)
         return
     end
+    -- Starter prompt, answered once; saved so resumes never re-ask.
+    local scfg = LoopSetup.run({
+        blurb = "Farms the field below: harvests mature crops, replants, dumps into chests found below.",
+        fuel = true,
+        fuelTags = true,
+        lava = true,
+        bucketSlot = 16,
+    })
+    if not scfg then
+        colorPrint("Setup aborted.", colors.red)
+        return
+    end
+    cfg = scfg
+    state.setup = scfg
     state.params = params
     saveProgress()
     createStartup()
     promptStart(false)
 end
 
+-- Enough fuel for a full cycle plus the trip home, capped at the limit.
+minFuel = LoopFuel.capEst(2 * state.params.length * state.params.width + 10)
+
 while true do
     local ok, err = pcall(runScan)
-    
+
     if not ok then
         if err == "Terminated" then
-            fullCleanup()
-            colorPrint("\nTerminated by user (Cleanup Complete).", colors.red)
+            saveProgress()
+            colorPrint("\nStopped. Progress saved; reboot or re-run to resume.", colors.green)
             return
         else
             error(err) -- Propagate other errors

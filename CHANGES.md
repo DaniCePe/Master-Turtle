@@ -4,6 +4,58 @@ This pack unifies Daniel's `MasterTurtle.zip` (his programs plus
 Inksaver's toolkit) into a public repo with a launcher, an updater, and
 two version trees. Everything below is relative to the zip contents.
 
+## v1.2 (2026-10-13): loop starter prompts, tags, refuel
+
+Autonomy rule: every question is answered once at the startup prompt.
+Mid-run, the turtle never waits for input. Only the movers (vacuum,
+cluster, cropper) get fuel questions; turning, attacking, and placing
+cost no fuel. chopchop and cranker are untouched.
+
+- New `lib/LoopSetup.lua` (both trees): options-driven starter prompt.
+  Prints a usage blurb, then asks only what each program needs: trash
+  side + item-ID tags, dump side, burn-found-fuel yes/no, fuel tags,
+  lava source (side at start, and/or below while traveling; never
+  above). Comma-separated tags, substring matched. Also provides shared
+  `dropToward` / `findSide` helpers used by attack and cobble.
+- New `lib/LoopFuel.lua` (both trees): quarry-inspired refuel for the
+  roamers. `ensure` burns tagged fuel one item at a time until the fuel
+  target is met (never burns untagged items); `stage` consolidates
+  found fuel into the bucket slot so dumps never throw it away;
+  `fillFrom` / `fillAtStart` handle the lava bucket workflow (empty
+  bucket + lava -> fill, then burn). Slot 16 rule: a bucket there
+  means the lava workflow, an empty slot may stage found fuel.
+- `attack` v2.2: trash side + trash tags prompt. Tagged loot goes to
+  the trash side; everything else to the auto-detected chest. The trash
+  side is excluded from chest detection for that run, so a chest on the
+  trash side is never mistaken for the dump chest.
+- `cobble` v5.1: dump-side prompt (front excluded, it is the mining
+  face). Cobblestone, stone, basalt, and obsidian go to the detected
+  chest; anything else goes to the dump side instead of clogging the
+  inventory. Dump side excluded from chest detection. Also fixes the
+  missed v1.1 stop upgrade: Q / Enter / Ctrl+T now stop cleanly.
+- `vacuum` v1.1: checks below for a chest/barrel on every cell and
+  dumps on find (fuel/bucket slot excluded). Refuels via LoopFuel when
+  empty instead of digging forever: burns tagged fuel found anywhere,
+  refills the bucket from the stated lava side at start or lava below
+  while traveling.
+- `cluster` v4.3: same dump and fuel treatment as vacuum. Setup
+  answers are saved in the restore file, so resumes never re-ask.
+- `cropper` v0.4: same dump and fuel treatment as vacuum. Stop now
+  preserves the save (like cluster) instead of wiping it; single Q or
+  Ctrl+T.
+
+## Planned (not yet built)
+
+- Opportunistic lava refills for the roaming loop programs (vacuum,
+  cluster, cropper): while traveling, if the block below is a lava
+  source and slot 16 holds an empty bucket, pause, fill the bucket,
+  and burn it for fuel. The stated lava source at the start position
+  remains the primary refill; this is the opportunistic backup.
+- Turtle interaction pause: if possible, detect when a player
+  right-clicks the turtle (opening its menu) and pause all movement and
+  actions until the menu closes, giving the user a chance to stop the
+  turtle before it leaves reach. Feasibility not yet confirmed.
+
 ## v1.1 (2026-10-12): Daniel's answers round 1
 
 - `os.epoch("utc")` in the cc-ai client: verified empirically under

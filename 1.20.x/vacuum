@@ -1,8 +1,15 @@
-version = 20261012.1200
--- VACUUM SWEEPER v1.0
--- Snake sweeps L x W, sucks floor items, dumps into chest if found.
+version = 20261013.1200
+-- VACUUM SWEEPER v1.1
+-- Snake sweeps L x W, sucks floor items, dumps into chests below.
+-- Checks below for a chest on every cell; refuels from tagged fuel
+-- or a lava bucket (slot 16) instead of digging forever at 0 fuel.
 -- Uses full tracked path + reverse replay (from AE2 Scanner v3.1)
--- Returns to start & facing after each sweep. Runs until ENTER.
+-- Returns to start & facing after each sweep. Runs until Q or Ctrl+T.
+
+local LoopSetup = require("lib.LoopSetup")
+local LoopFuel = require("lib.LoopFuel")
+local cfg = LoopSetup.defaults()
+local minFuel = 0
 
 --------------------------------------
 -- UTIL / UI
@@ -39,8 +46,14 @@ end
 
 local function forwardSafe()
     while not turtle.forward() do
-        turtle.dig()
-        turtle.attack()
+        if turtle.getFuelLevel() == 0 then
+            -- Out of fuel: burn tagged fuel or use the bucket instead of
+            -- digging at nothing forever.
+            LoopFuel.ensure(cfg, minFuel)
+        else
+            turtle.dig()
+            turtle.attack()
+        end
         sleep(0.05)
     end
 end
@@ -80,42 +93,33 @@ local function suckAll()
     turtle.suckDown()
 end
 
-local function totalItems()
-    local t = 0
-    for s=1,16 do
-        local d = turtle.getItemDetail(s)
-        if d then t = t + d.count end
-    end
-    return t
-end
-
 local function isChest(name)
     if not name then return false end
     return string.find(name, "chest") or string.find(name, "barrel")
 end
 
+-- The fuel/bucket slot is never dumped.
 local function dumpAllDown()
     for s=1,16 do
-        turtle.select(s)
-        turtle.dropDown()
+        if s ~= cfg.bucketSlot then
+            turtle.select(s)
+            turtle.dropDown()
+        end
     end
     turtle.select(1)
 end
 
-local function searchForChest(maxSteps)
-    local startDir = dir
-
-    for step = 1, maxSteps do
-        local exists, info = turtle.inspectDown()
-        if exists and isChest(info.name) then
-            return true, startDir
-        end
-        forwardTracked()
+-- Called on every cell: dump into a chest below when found, and
+-- opportunistically fill the bucket from lava below when traveling.
+local function cellCheck()
+    local has, data = turtle.inspectDown()
+    if not has or not data or not data.name then return end
+    if isChest(data.name) then
+        dumpAllDown()
+        LoopFuel.stage(cfg)
+    elseif cfg.lavaUnder and data.name:find("lava") then
+        LoopFuel.fillFrom(turtle.inspectDown, turtle.placeDown, cfg)
     end
-
-    retracePath()
-    while dir ~= startDir do turnLeftTracked() end
-    return false, startDir
 end
 
 --------------------------------------
@@ -127,19 +131,7 @@ local function sweep(length, width)
     for row = 1, width do
         for col = 1, length do
             suckAll()
-
-            if totalItems() >= 256 then
-                colorPrint("Inventory >= 256: searching for chest...", colors.red)
-                local found, sd = searchForChest(length)
-                if found then
-                    colorPrint("Chest found! Dumping...", colors.green)
-                    dumpAllDown()
-                    retracePath()
-                    while dir ~= sd do turnLeftTracked() end
-                else
-                    colorPrint("No chest found.", colors.red)
-                end
-            end
+            cellCheck()
 
             if col < length then forwardTracked() end
         end
@@ -180,6 +172,21 @@ end
 local L = cliL > 0 and cliL or readNum("Enter area LENGTH:")
 local W = cliW > 0 and cliW or readNum("Enter area WIDTH:")
 
+local scfg = LoopSetup.run({
+    blurb = "Sucks up floor items in an LxW snake sweep, dumps into chests found below, returns to start each cycle.",
+    fuel = true,
+    fuelTags = true,
+    lava = true,
+    bucketSlot = 16,
+})
+if not scfg then
+    colorPrint("Setup aborted.", colors.red)
+    return
+end
+cfg = scfg
+-- Enough fuel for a full sweep plus the trip home, capped at the limit.
+minFuel = LoopFuel.capEst(2 * L * W + 10)
+
 colorPrint("Press ENTER to start. Press Q (or Ctrl+T) to stop.", colors.green)
 read()
 
@@ -200,6 +207,9 @@ local function run()
         dir = startDir
         sweep(L, W)
         returnHome(startDir)
+        -- Back at start facing the start direction: refill the bucket
+        -- from the stated lava side when possible.
+        LoopFuel.fillAtStart(cfg)
     end
 end
 

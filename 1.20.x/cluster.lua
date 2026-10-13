@@ -1,6 +1,12 @@
--- AE2 QUARTZ CLUSTER SCANNER v4.2 (Quarry Edition)
--- Date: 2026-10-12
+-- AE2 QUARTZ CLUSTER SCANNER v4.3 (Quarry Edition)
+-- Date: 2026-10-13
 -- Inspired by Civilwargeeky's Quarry
+-- v4.3 Changes:
+--   - Starter prompt (lib/LoopSetup): fuel questions answered once.
+--   - Refuel: burns tagged fuel found while working, or a lava bucket
+--     in slot 16 (lava side at start, or lava below while traveling),
+--     instead of spinning forever at 0 fuel.
+--   - Dump excludes the fuel/bucket slot; found fuel is staged there.
 -- v4.2 Changes:
 --   - Graceful stop: single Q press or Ctrl+T stops the scan and SAVES
 --     progress (replaces the 3-second hold-Q abort that wiped the save).
@@ -16,7 +22,7 @@
 --   - Logging: Tracks runs in 'Cluster_Logs' and events in 'cluster_log.txt'.
 --   - Enhanced UI: Fuel warnings, cycle count, position tracking.
 
-local VERSION = "4.2.0"
+local VERSION = "4.3.0"
 local RESTORE_FILE = ".cluster_restore"
 local LOG_FILE = "cluster_log.txt"
 local LOG_DIR = "Cluster_Logs"
@@ -28,6 +34,10 @@ local cluster_backup = "startup_old_cluster"
 --------------------------------------
 local tArgs = { ... }
 local Resume = require("lib.Resume")
+local LoopSetup = require("lib.LoopSetup")
+local LoopFuel = require("lib.LoopFuel")
+local cfg = LoopSetup.defaults()
+local minFuel = 0
 local params = {
     length = 0,
     width = 0,
@@ -198,9 +208,13 @@ local function forward()
     while not turtle.forward() do
         -- Blocked? Dig? Attack? Refuel?
         if turtle.getFuelLevel() == 0 then
-            log("Out of fuel at "..state.x..","..state.z)
-            colorPrint("OUT OF FUEL", colors.red)
-            sleep(1)
+            -- Out of fuel: burn tagged fuel or use the bucket instead of
+            -- spinning forever.
+            if not LoopFuel.ensure(cfg, minFuel) then
+                log("Out of fuel at "..state.x..","..state.z)
+                colorPrint("OUT OF FUEL", colors.red)
+                sleep(1)
+            end
         else
             turtle.dig()
             turtle.attack()
@@ -273,13 +287,19 @@ local function checkInventory()
         -- For now, we will handle this in the main loop or opportunistic dumping
     end
     
-    -- Opportunistic dump
+    -- Opportunistic dump (fuel/bucket slot excluded)
     local has, data = turtle.inspectDown()
     if has and isStorage(data.name) then
-        for i=1,16 do turtle.select(i); turtle.dropDown() end
+        for i=1,16 do
+            if i ~= cfg.bucketSlot then turtle.select(i); turtle.dropDown() end
+        end
         turtle.select(1)
         state.inventoryFull = false
+        LoopFuel.stage(cfg)
         log("Dumped items into storage at "..state.x..","..state.z)
+    elseif has and cfg.lavaUnder and data.name:find("lava") then
+        -- Lava below while traveling: fill the bucket when possible.
+        LoopFuel.fillFrom(turtle.inspectDown, turtle.placeDown, cfg)
     end
 end
 
@@ -351,6 +371,9 @@ local function scanLogic()
     state.isReturning = true
     goTo(0,0)
     turnTo(0)
+    -- Back at start facing the start direction: refill the bucket from
+    -- the stated lava side when possible.
+    LoopFuel.fillAtStart(cfg)
     
     state.cycleCount = state.cycleCount + 1
     logRunSummary()
@@ -416,6 +439,7 @@ local function promptStart(resume)
 end
 
 if loadProgress() then
+    if state.setup then cfg = state.setup end
     promptStart(true)
 end
 
@@ -431,11 +455,28 @@ if state.x == 0 and state.z == 0 and state.cycleCount == 0 then
         colorPrint("Invalid arguments.", colors.red)
         return
     end
+    -- Starter prompt, answered once; saved so resumes never re-ask.
+    local scfg = LoopSetup.run({
+        blurb = "Scans the field below for AE2 quartz clusters, digs them, dumps into chests found below.",
+        fuel = true,
+        fuelTags = true,
+        lava = true,
+        bucketSlot = 16,
+    })
+    if not scfg then
+        colorPrint("Setup aborted.", colors.red)
+        return
+    end
+    cfg = scfg
+    state.setup = scfg
     state.params = params -- Save to state
     saveProgress()
     createStartup() -- Enable auto-resume
     promptStart(false)
 end
+
+-- Enough fuel for a full cycle plus the trip home, capped at the limit.
+minFuel = LoopFuel.capEst(2 * state.params.length * state.params.width + 10)
 
 -- Main Loop
 while true do

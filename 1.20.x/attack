@@ -1,16 +1,22 @@
-version = 20261012.1200
--- Attacker v2.1 (CC:Tweaked)
+version = 20261013.1200
+-- Attacker v2.2 (CC:Tweaked)
 -- Features:
 --  * Continuous attacks forward
 --  * Adjustable delay between attacks
 --  * Auto-select weapon (prefers swords)
 --  * Auto-refuel from inventory
 --  * Auto-dump items to chests if 6+ slots are filled
+--  * Trash side + item tags: tagged loot goes to the trash side,
+--    everything else to the auto-detected chest (trash side is never
+--    mistaken for the chest)
 --  * UI with attack/hit counters
 --  * Stop with Q or Ctrl+T
 
 local stopFlag = false
 local attacksPerformed, hitsRegistered = 0, 0
+
+local LoopSetup = require("lib.LoopSetup")
+local cfg = LoopSetup.defaults()
 
 --------------------------------------
 -- COLORS / UI HELPERS
@@ -96,35 +102,34 @@ local function occupiedSlots()
     return count
 end
 
-local function tryDump(inspectFunc, dropFunc)
-    local ok, data = inspectFunc()
-    if ok and data.name and string.find(data.name, "chest") then
-        local dumpedSomething = false
-        for i=1,16 do
-            if turtle.getItemCount(i) > 0 then
-                turtle.select(i)
-                local before = turtle.getItemCount(i)
-                dropFunc()
-                local after = turtle.getItemCount(i)
-                if after < before then dumpedSomething = true end
-            end
-        end
-        turtle.select(1)
-        return dumpedSomething
+local function isChestName(name)
+    return name and string.find(name, "chest")
+end
+
+local function isTrash(i)
+    local d = turtle.getItemDetail(i)
+    return d and d.name and #(cfg.trashTags or {}) > 0
+        and LoopSetup.matches(d.name, cfg.trashTags)
+end
+
+-- Sorted dump: tagged items go to the trash side (plain drop, no chest
+-- needed there); everything else goes to the auto-detected chest. The
+-- trash side is excluded from chest detection for this run, so a chest
+-- sitting on the trash side is never mistaken for the dump chest.
+local function dumpSorted()
+    if cfg.trashSide ~= "none" and #(cfg.trashTags or {}) > 0 then
+        LoopSetup.dropToward(cfg.trashSide, isTrash)
     end
-    return false
+    local chestSide = LoopSetup.findSide(isChestName, cfg.trashSide)
+    if not chestSide then return false end
+    LoopSetup.dropToward(chestSide, function(i)
+        return turtle.getItemCount(i) > 0 and not isTrash(i)
+    end)
+    return true
 end
 
 local function dumpToChest()
-    if tryDump(turtle.inspect, turtle.drop) then return true end
-    if tryDump(turtle.inspectUp, turtle.dropUp) then return true end
-    if tryDump(turtle.inspectDown, turtle.dropDown) then return true end
-    turtle.turnLeft()
-    if tryDump(turtle.inspect, turtle.drop) then turtle.turnRight() return true end
-    turtle.turnRight(); turtle.turnRight()
-    if tryDump(turtle.inspect, turtle.drop) then turtle.turnLeft() return true end
-    turtle.turnLeft()
-    return false
+    return dumpSorted()
 end
 
 --------------------------------------
@@ -133,7 +138,7 @@ end
 local function drawUI(delay)
     term.clear()
     term.setCursorPos(1,1)
-    colorPrint("=== Attacker v2.1 ===", colors.blue)
+    colorPrint("=== Attacker v2.2 ===", colors.blue)
     print(string.rep("=",30))
     colorWrite("Mode: ", colors.green); colorPrint("continuous", colors.orange)
     colorWrite("Direction: ", colors.green); colorPrint("front", colors.orange)
@@ -210,9 +215,18 @@ end
 --------------------------------------
 term.clear()
 term.setCursorPos(1,1)
-colorPrint("Welcome to Attacker v2.1!", colors.blue)
+colorPrint("Welcome to Attacker v2.2!", colors.blue)
 colorPrint("==========================", colors.blue)
 local delay = readNumber("Delay between attacks (seconds, e.g. 0.1):", 0.1)
+local scfg = LoopSetup.run({
+    blurb = "Sits in front of a mob farm, attacks forward, dumps loot to a detected chest.",
+    trash = true,
+})
+if not scfg then
+    colorPrint("Setup aborted.", colors.red)
+    return
+end
+cfg = scfg
 colorPrint("Press ENTER to begin. (Q or Ctrl+T during run to stop)", colors.green)
 read()
 
