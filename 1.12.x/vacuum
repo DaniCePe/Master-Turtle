@@ -180,14 +180,14 @@ end
 local L = cliL > 0 and cliL or readNum("Enter area LENGTH:")
 local W = cliW > 0 and cliW or readNum("Enter area WIDTH:")
 
-colorPrint("Press ENTER to start. Press ENTER again to stop.", colors.green)
+colorPrint("Press ENTER to start. Press Q (or Ctrl+T) to stop.", colors.green)
 read()
 
 local stop = false
 local function watch()
     while true do
-        local e,k = os.pullEvent("key")
-        if k == keys.enter then stop = true return end
+        local e,k = os.pullEvent()
+        if e == "terminate" or (e == "key" and (k == keys.q or k == keys.enter)) then stop = true return end
     end
 end
 

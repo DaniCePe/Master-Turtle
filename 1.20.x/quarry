@@ -1,3 +1,6 @@
+-- Lua 5.2 compat (CC:Tweaked 1.109+): restore the 5.1-isms this program uses when missing.
+if not loadstring then loadstring = load end
+if not unpack then unpack = table.unpack end
 --Civilwargeeky's Quarry Program--
   VERSION = "3.6.4.5"
 --[[
@@ -15,7 +18,20 @@ New Parameters:
     -forcePrompt [param]: This will add to a list of parameters to force prompt for. So if you say "-forcePrompt doRefuel" it will prompt you "Length","Width","Height","Invert","Do Refuel" etc.
 ]]
 --Defining things
-civilTable = nil; _G.civilTable = {}; setmetatable(civilTable, {__index = getfenv()}); setfenv(1,civilTable)
+if _QUARRY_SANDBOXED then
+  civilTable = getfenv(1) -- relaunched below with the sandbox env (Lua 5.2 path)
+else
+  civilTable = nil; _G.civilTable = {}; setmetatable(civilTable, {__index = getfenv()});
+  if not pcall(setfenv, 1, civilTable) then
+    -- Lua 5.2 (CC:Tweaked 1.109+): a running chunk's environment cannot be changed,
+    -- so relaunch self with civilTable as the environment and stop here.
+    -- getfenv(1) in the relaunched copy IS civilTable, so saveProgress and resume
+    -- work exactly as before.
+    local args = {...}
+    civilTable._QUARRY_SANDBOXED = true
+    return os.run(civilTable, shell.getRunningProgram(), (table.unpack or unpack)(args))
+  end
+end
 originalDay = os.day() --Used in logging
 numResumed = 0 --Number of times turtle has been resumed
 -------Defaults for Arguments----------
@@ -680,6 +696,7 @@ end
 --Auto Startup
 addParam("autoResume", "Auto Resume", "boolean", nil, doBackup)
 paramAlias("autoResume","autoRestart")
+paramAlias("autoResume","autoRestore")
 addParam("startupRename", "Startup Rename","string", nil, autoResume)
 addParam("startupName", "Startup File", "string", nil, autoResume)
 --Ore Quarry
@@ -1201,9 +1218,37 @@ function display() --This is just the last screen that displays at the end
   screen(1,1)
   print("Total Blocks Mined: "..mined)
   print("Current Fuel Level: "..checkFuel())
-  print("Cobble: "..totals.cobble)
-  print("Usable Fuel: "..totals.fuel)
-  print("Other: "..totals.other)
+  if not preciseTotals or not exactTotals then
+    print("Cobble: "..totals.cobble)
+    print("Usable Fuel: "..totals.fuel)
+    print("Other: "..totals.other)
+  else
+    local tab = {} --Sorting section stolen from quarry receiver
+    for a,b in pairs(exactTotals) do --Sorting the table
+      if #tab == 0 then --Have to initialize or rest does nothing :)
+        tab[1] = {a,b}
+      else
+        for i=1, #tab do --This is a really simple sort. Probably not very efficient, but I don't care.
+          if b > tab[i][2] then --Gets the second value from the table, which is the itemCount
+            table.insert(tab, i, {a,b})
+            break
+          elseif i == #tab then --Insert at the end if not bigger than anything
+            table.insert(tab,{a,b})
+          end
+        end
+      end
+    end
+    local x, y = term.getSize()
+    for i=1, math.min(y-(rednetEnabled and 3 or 2), #tab) do --Print all the blocks in order
+      local firstPart = "#"..tab[i][1]..": "
+      local spaces = ""
+      for j=1, x-#firstPart-#tostring(tab[i][2]) do spaces = spaces.." " end
+      term.setTextColor(i%2==0 and colors.white or colors.black) --Swap colors every other for best visibility
+      term.setBackgroundColor(i%2==0 and colors.black or colors.white)
+      print(firstPart,spaces,tab[i][2])
+    end
+    term.setTextColor(colors.white); term.setBackgroundColor(colors.black) --Reset to normal
+  end
   if rednetEnabled then
     print("")
     print("Sent Stop Message")

@@ -1,6 +1,10 @@
--- AE2 QUARTZ CLUSTER SCANNER v4.1 (Quarry Edition)
--- Date: 2025-12-13
+-- AE2 QUARTZ CLUSTER SCANNER v4.2 (Quarry Edition)
+-- Date: 2026-10-12
 -- Inspired by Civilwargeeky's Quarry
+-- v4.2 Changes:
+--   - Graceful stop: single Q press or Ctrl+T stops the scan and SAVES
+--     progress (replaces the 3-second hold-Q abort that wiped the save).
+--     Reboot or re-run to resume where it left off.
 -- v4.1 Changes:
 --   - Added "Q to Abort" with cleanup (removes session/startup files).
 --   - Added 5s Auto-Start Timer for Resume and New Runs.
@@ -12,7 +16,7 @@
 --   - Logging: Tracks runs in 'Cluster_Logs' and events in 'cluster_log.txt'.
 --   - Enhanced UI: Fuel warnings, cycle count, position tracking.
 
-local VERSION = "4.1.0"
+local VERSION = "4.2.0"
 local RESTORE_FILE = ".cluster_restore"
 local LOG_FILE = "cluster_log.txt"
 local LOG_DIR = "Cluster_Logs"
@@ -116,7 +120,7 @@ local function drawUI()
         colorPrint(fuel.." / "..fuelMax, colors.green)
     end
     
-    colorPrint("Press Q 3 sec to Terminate", colors.red)
+    colorPrint("Press Q (or Ctrl+T) to stop; progress is saved", colors.red)
 
     if state.isReturning then
         colorPrint(">> RETURNING TO START <<", colors.orange)
@@ -364,18 +368,9 @@ local function scanLogic()
 end
 
 local function listenForExit()
-    local timer
-    local holding = false
     while true do
         local ev, p1 = os.pullEvent()
-        if ev == "key" and p1 == keys.q then
-            if not holding then
-                holding = true
-                timer = os.startTimer(3)
-            end
-        elseif ev == "key_up" and p1 == keys.q then
-            holding = false
-        elseif ev == "timer" and p1 == timer and holding then
+        if ev == "terminate" or (ev == "key" and (p1 == keys.q or p1 == keys.enter)) then
             error("Terminated", 0)
         end
     end
@@ -448,8 +443,8 @@ while true do
     
     if not ok then
         if err == "Terminated" then
-            fullCleanup()
-            colorPrint("\nTerminated by user (Cleanup Complete).", colors.red)
+            saveProgress()
+            colorPrint("\nStopped. Progress saved; reboot or re-run to resume.", colors.green)
             return
         else
             error(err) -- Propagate other errors

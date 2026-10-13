@@ -62,8 +62,8 @@ local ccMajorVersion = _HOST:sub(15, _HOST:find("Minecraft") - 2) --eg ComputerC
 local ccMinorVersion = 0
 
 local function checkFileSystem()
-	local oldurl = "https://raw.githubusercontent.com/Inksaver/Minecraft-Toolkit/main/"
-	local url = "https://raw.githubusercontent.com/Inksaver/Computercraft-GUI/main/"
+	local oldurl = "https://raw.githubusercontent.com/DaniCePe/Master-Turtle/main/1.20.x/"
+	local url = "https://raw.githubusercontent.com/DaniCePe/Master-Turtle/main/1.20.x/"
 	
 	local lib = {}
 	

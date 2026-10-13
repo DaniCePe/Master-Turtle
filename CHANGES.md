@@ -4,6 +4,53 @@ This pack unifies Daniel's `MasterTurtle.zip` (his programs plus
 Inksaver's toolkit) into a public repo with a launcher, an updater, and
 two version trees. Everything below is relative to the zip contents.
 
+## v1.1 (2026-10-12): Daniel's answers round 1
+
+- `os.epoch("utc")` in the cc-ai client: verified empirically under
+  ComputerCraft 1.80pr1 (the 1.12.x target) via CCEmuX; it exists and
+  returns a millisecond timestamp. No fallback needed, nothing changed.
+- Platformer roof mode reworked to Daniel's spec (v6.1): start at any
+  level, give `-height N` as blocks-up, the turtle ascends N blocks,
+  lays one flat LxW roof, descends back to its start level (stepping
+  off the footprint first so it never digs through its own roof).
+  `-inverted` roof places the ceiling upward from the start level with
+  no climbing. Resume-aware throughout.
+- Quarry vs upstream 3.7.0 Beta: ported `paramAlias("autoResume",
+  "autoRestore")`, the sorted precise-totals end display (the flag
+  previously tracked exact totals but never showed them), and a missing
+  trailing newline. Deliberately skipped: the rewritten help browser
+  (ours works; large UI rewrite, not a fix), `quarryConfig.qc`
+  auto-load (uncertain resume interaction), `preciseTotals` default
+  flip to true (behavior change). Resume system verified
+  byte-identical between versions; untouched.
+- tk3 vs upstream (20260526): no ports. Upstream still has the
+  impossible version conditions we fixed, and its 410 diverging hunks
+  are design/version differences, not clear bug fixes. Its 10 new
+  functions (composter, createClayfarm, createDiveColumn, findSeabed,
+  makeMud, createBubbleLiftOLD, utils.createBasement,
+  utils.getRoofStats, utils.getItemsForInventory, utils.logRvalues)
+  are available on request.
+- Graceful stop for every `[LOOP]` program (chopchop, cranker, attack,
+  vacuum, cluster): Q or Ctrl+T now stops cleanly (previously Enter
+  only, and Ctrl+T was ignored). Cluster saves its resume state on
+  stop instead of wiping it; the 3-second hold-Q is gone.
+- Self-update URLs: `go.lua`, `lavaRefuel.lua`, and `tk3.lua` had
+  runtime fallbacks downloading from Inksaver's GitHub; all repointed
+  to `DaniCePe/Master-Turtle/main/<tree>/`. No runtime references to
+  Inksaver's raw URLs remain (comment examples untouched).
+- Quarry Lua 5.2 fix (1.20.x; no-op on 1.12.x): the
+  `disable_lua51_features` config toggle was removed in CC:Tweaked
+  1.108.4, and on 1.109+ `setfenv(1, ...)` throws instead of sandboxing
+  the program, so the quarry could not start at all on modern
+  CC:Tweaked. The fix is in the quarry itself: a top-of-file shim
+  restores `loadstring`/`unpack` when missing, and the `setfenv(1, ...)`
+  call is wrapped in `pcall`; when it fails, the quarry relaunches
+  itself via `os.run` with the sandbox table as its environment and
+  returns the result. On 5.1 `setfenv` succeeds and the original path
+  runs unchanged. The resume/save logic is untouched. `master.lua`
+  also had a bare `unpack(...)` call that broke launching anything with
+  args on 1.20.x; now `(table.unpack or unpack)(...)`.
+
 ## Removed
 
 - `tk.lua` (Inksaver's older toolkit): the version-detection bug

@@ -39,7 +39,7 @@ _G.MasterTurtle = {
             { flag = "-length", label = "Length (Z)" },
             { flag = "-width", label = "Width (X)" },
             { flag = "-mode", label = "Mode (floor/walls/solid/hollow/roof)" },
-            { flag = "-height", label = "Height (layers)" },
+            { flag = "-height", label = "Height: layers (blocks-up for roof)" },
             { flag = "-inverted", label = "Inverted (true/false)" },
           } },
         { prog = "cropper", name = "Cropper",
@@ -132,7 +132,7 @@ local function runProgram(launch)
         print("Args: " .. table.concat(launch.args, " "))
     end
     print("")
-    local ok, err = shell.run(launch.prog, unpack(launch.args or {}))
+    local ok, err = shell.run(launch.prog, (table.unpack or unpack)(launch.args or {}))
     print("")
     if not ok then
         print("Exited with error: " .. tostring(err))

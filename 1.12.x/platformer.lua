@@ -1,6 +1,10 @@
 -- PLATFORMER v6.0
 -- Date: 2026-10-12
 -- Inspired by Cluster Scanner v4.1 Logic
+-- v6.1 Changes:
+--   - Roof mode rework (Daniel's spec): start at any level, ascend N
+--     blocks, lay one flat LxW layer, descend back. Inverted roof
+--     places the ceiling upward from the start level, no climbing.
 -- v6.0 Changes:
 --   - Build modes: floor (v5 behavior), walls, solid, hollow, roof.
 --   - Inverted option: place up / build from head height.
@@ -75,9 +79,15 @@ local function applyParamDefaults()
     -- Fill in v6.0 params missing from older saves; idempotent.
     local p = state.params
     if p.mode == nil then p.mode = "floor" end
-    if p.height == nil or p.height < 1 then p.height = 1 end
+    if p.mode == "floor" then p.height = 1 end
+    if p.height == nil then p.height = 1 end
+    if p.mode == "roof" then
+        -- Roof height = blocks to ascend (0 = build at current level).
+        if p.height < 0 then p.height = 0 end
+    elseif p.height < 1 then
+        p.height = 1
+    end
     if p.inverted == nil then p.inverted = false end
-    if p.mode == "floor" or p.mode == "roof" then p.height = 1 end
     if state.y == nil then state.y = 0 end
     if state.layer == nil then state.layer = 1 end
     if state.layerStarted == nil then state.layerStarted = false end
@@ -218,8 +228,15 @@ local function drawUI()
 
     colorPrint("Built: "..state.built.." / "..total, colors.orange)
     print("Pos: "..state.x..","..state.z..","..state.y.." Facing: "..state.facing)
-    print("Mode: "..state.params.mode.."  Layer: "..
-        math.min(state.layer, state.params.height).."/"..state.params.height)
+    local modeLine = "Mode: "..state.params.mode
+    if state.params.mode == "roof" then
+        modeLine = modeLine.."  Up: "..state.y.."/"..state.params.height..
+            (state.params.inverted and " (from below)" or "")
+    else
+        modeLine = modeLine.."  Layer: "..
+            math.min(state.layer, state.params.height).."/"..state.params.height
+    end
+    print(modeLine)
     
     local fuel = turtle.getFuelLevel()
     local fuelMax = turtle.getFuelLimit()
@@ -365,7 +382,7 @@ local function totalCells()
         if H == 2 then return 2 * L * W end
         return 2 * L * W + (H - 2) * perim
     elseif mode == "roof" then
-        return L * W * H -- roof cap, every cell every layer
+        return L * W -- one flat layer at the roof level
     end
     return L * W * H -- floor slab, every cell every layer
 end
@@ -402,10 +419,44 @@ local function doSnakeLayer(layer)
     end
 end
 
+local function buildRoof()
+    -- Roof spec (Daniel): start at ANY level. Non-inverted: ascend
+    -- height-up blocks, lay one flat LxW layer, descend back to the
+    -- start level. Inverted: place the ceiling upward from the start
+    -- level, no climbing. Every step is resume-aware via state.y
+    -- and state.layer.
+    log("Starting roof build, height-up=" .. state.params.height ..
+        (state.params.inverted and " (inverted, from below)" or ""))
+    if not state.params.inverted then
+        while state.y < state.params.height do up() end
+    end
+    if state.layer <= 1 then
+        if not state.layerStarted then
+            goTo(0, 0)
+            state.layerStarted = true
+            saveProgress()
+        end
+        doSnakeLayer(1)
+        state.layer = 2
+        state.layerStarted = false
+        saveProgress()
+    end
+    if not state.params.inverted and state.params.height > 0 then
+        -- Step off the roof footprint before descending; the column we
+        -- ascended through is now roofed over.
+        goTo(state.params.width, 0)
+        while state.y > 0 do down() end
+        goTo(0, 0)
+    end
+end
+
 local function buildLogic()
     log("Starting build cycle, mode=" .. state.params.mode)
     state.isReturning = false
 
+    if state.params.mode == "roof" then
+        buildRoof()
+    else
     for layer = 1, state.params.height do
         if layer < state.layer then
             -- Layer already completed in a previous session (resume); skip.
@@ -423,6 +474,7 @@ local function buildLogic()
                 changeLayer()
             end
         end
+    end
     end
 
     drawUI()
@@ -502,7 +554,7 @@ local function promptOptions()
         colorPrint("  2) Walls  - perimeter walls, H layers high", colors.lightGray)
         colorPrint("  3) Solid  - filled LxWxH block", colors.lightGray)
         colorPrint("  4) Hollow - shell: floor + walls + roof", colors.lightGray)
-        colorPrint("  5) Roof   - single layer ceiling", colors.lightGray)
+        colorPrint("  5) Roof   - go up N blocks, flat roof, come back", colors.lightGray)
         io.write("Enter mode [1-5] (default 1): ")
         local modes = { "floor", "walls", "solid", "hollow", "roof" }
         local m = (read() or ""):lower()
@@ -515,15 +567,32 @@ local function promptOptions()
             params.mode = "floor"
         end
     end
-    if params.mode ~= "floor" and params.mode ~= "roof" and params.height == nil then
-        io.write("Enter height in layers: ")
-        params.height = math.floor(tonumber(read()) or 1)
-        if params.height < 1 then params.height = 1 end
-    end
-    if params.inverted == nil then
-        io.write("Inverted (place up instead of down)? [y/N]: ")
-        local ans = (read() or ""):lower()
-        params.inverted = ans:sub(1, 1) == "y"
+    if params.mode == "roof" then
+        -- Roof spec: start at any level. Non-inverted: ascend N blocks,
+        -- lay one flat layer, descend back. Inverted: place the ceiling
+        -- upward from the start level, no climbing.
+        if params.inverted == nil then
+            io.write("Build from below (place up, no climbing)? [y/N]: ")
+            local ans = (read() or ""):lower()
+            params.inverted = ans:sub(1, 1) == "y"
+        end
+        if not params.inverted and params.height == nil then
+            io.write("How many blocks up to the roof level? ")
+            params.height = math.floor(tonumber(read()) or 0)
+            if params.height < 0 then params.height = 0 end
+        end
+        if params.height == nil then params.height = 0 end
+    else
+        if params.mode ~= "floor" and params.height == nil then
+            io.write("Enter height in layers: ")
+            params.height = math.floor(tonumber(read()) or 1)
+            if params.height < 1 then params.height = 1 end
+        end
+        if params.inverted == nil then
+            io.write("Inverted (place up instead of down)? [y/N]: ")
+            local ans = (read() or ""):lower()
+            params.inverted = ans:sub(1, 1) == "y"
+        end
     end
 end
 

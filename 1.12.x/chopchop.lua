@@ -103,7 +103,7 @@ local function chopLoop()
     info("CHOPPING AWAY")
 
     term.setTextColor(colors.blue)
-    print("Press ENTER to stop.")
+    print("Press Q (or Ctrl+T) to stop.")
     print("Chopped for: 00:00")
     print("--------------------------------")
 
@@ -144,8 +144,8 @@ end
 -------------------------------------
 local function stopListener()
     while true do
-        local event, key = os.pullEvent("key")
-        if key == keys.enter then
+        local ev, key = os.pullEvent()
+        if ev == "terminate" or (ev == "key" and (key == keys.q or key == keys.enter)) then
             stopFlag = true
             term.setTextColor(colors.green)
             return

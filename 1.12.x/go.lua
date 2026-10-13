@@ -172,7 +172,7 @@ function tunnel(length)
 end
 
 function main()
-	local url = "https://raw.githubusercontent.com/Inksaver/Computercraft-GUI/main/"
+	local url = "https://raw.githubusercontent.com/DaniCePe/Master-Turtle/main/1.12.x/"
 	if not checkLibs("lib", "clsTurtle") then
 		-- use Github get to download clsTurtle to libs folder
 		getFileFromGithub(url, "lib/clsTurtle.lua")

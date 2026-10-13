@@ -7,7 +7,7 @@ version = 20261012.1200
 --  * Auto-refuel from inventory
 --  * Auto-dump items to chests if 6+ slots are filled
 --  * UI with attack/hit counters
---  * Stop by pressing ENTER
+--  * Stop with Q or Ctrl+T
 
 local stopFlag = false
 local attacksPerformed, hitsRegistered = 0, 0
@@ -152,7 +152,7 @@ local function drawUI(delay)
     colorWrite("Inventory slots used: ", colors.green)
     colorPrint(occupiedSlots().."/16", colors.orange)
     print("")
-    colorPrint("Press ENTER to stop.", colors.red)
+    colorPrint("Press Q (or Ctrl+T) to stop.", colors.red)
 end
 
 --------------------------------------
@@ -196,8 +196,8 @@ end
 --------------------------------------
 local function stopListener()
     while true do
-        local ev,key = os.pullEvent("key")
-        if key==keys.enter then
+        local ev,key = os.pullEvent()
+        if ev=="terminate" or (ev=="key" and (key==keys.q or key==keys.enter)) then
             stopFlag=true
             colorPrint("\nUser requested stop.", colors.red)
             return
@@ -213,7 +213,7 @@ term.setCursorPos(1,1)
 colorPrint("Welcome to Attacker v2.1!", colors.blue)
 colorPrint("==========================", colors.blue)
 local delay = readNumber("Delay between attacks (seconds, e.g. 0.1):", 0.1)
-colorPrint("Press ENTER to begin. (ENTER again during run to stop)", colors.green)
+colorPrint("Press ENTER to begin. (Q or Ctrl+T during run to stop)", colors.green)
 read()
 
 parallel.waitForAny(function() continuousWorker(delay) end, stopListener)

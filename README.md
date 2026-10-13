@@ -12,7 +12,10 @@ Two trees, pick the one matching your Minecraft version:
 
 Both trees ship the same programs. The only difference: `1.20.x` also
 includes `tk3.lua` (Inksaver's classic GUI toolkit), which needs modern
-peripheral APIs.
+peripheral APIs. Note for 1.20.x: modern CC:Tweaked runs Lua 5.2 and
+removed the old `disable_lua51_features` config toggle entirely; the
+pack handles 5.2 internally (the quarry shims the 5.1 functions it
+needs), so there is nothing to configure.
 
 ## Install
 
@@ -48,7 +51,9 @@ Reboot the turtle. The launcher menu appears (via `startup.lua`):
 - Up/Down moves, Enter runs, Q quits. Mouse works on advanced computers.
 - Programs that need dimensions show a prompt first; fill in what you
   know and leave the rest blank (the program will ask).
-- Entries tagged `[LOOP]` run until you stop them (Ctrl+T, then Enter).
+- Entries tagged `[LOOP]` run until you stop them: press Q or Ctrl+T.
+  The stop is graceful; long runners save their progress so you can
+  resume later.
 - When a program exits you return to the menu.
 
 You can also run any program directly from the shell, e.g.
@@ -104,7 +109,7 @@ the quarry will not load.
 
 ### Platformer (builder)
 
-`platformer`: was a floor clearer, now a real builder (v6.0). Lays
+`platformer`: was a floor clearer, now a real builder (v6.1). Lays
 blocks in a rectangle, one layer at a time, snake pattern.
 
 Options (CLI args or interactive prompts, quarry-style):
@@ -112,13 +117,19 @@ Options (CLI args or interactive prompts, quarry-style):
 - `-length N` `-width N`: footprint, `-height N`: layers (default 1)
 - `-mode M`: `floor` (solid slab), `walls` (perimeter only),
   `solid` (everything), `hollow` (solid top and bottom, walls between),
-  `roof` (solid cap)
+  `roof` (see below)
 - `-inverted`: build downward from the turtle instead of upward
+
+Roof mode: the turtle starts at any level. Give `-height N` as blocks-up;
+the turtle ascends N blocks, lays one flat roof over the footprint, then
+descends back to its start. With `-inverted`, it places the ceiling
+upward from the start level instead (no climbing).
 
 Examples: a 20x12 wall ring 4 high:
 `platformer -length 20 -width 12 -mode walls -height 4`.
 A hollow 8x8x5 room: `platformer -length 8 -width 8 -mode hollow -height 5`.
 A 16x16 floor: `platformer -length 16 -width 16 -mode floor`.
+A roof 6 blocks up over 10x10: `platformer -length 10 -width 10 -mode roof -height 6`.
 
 Resume: progress is saved per layer to `.platformer_restore`; a run
 interrupted mid-build resumes on the layer it left off. A `startup`
