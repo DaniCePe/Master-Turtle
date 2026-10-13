@@ -1,4 +1,4 @@
-version = 20261013.0300
+version = 20261013.1200
 -- FILLER v1.0
 -- Date: 2025-12-17
 -- Adapted from Platformer v5.0
@@ -33,6 +33,13 @@ end
 --------------------------------------
 local tArgs = { ... }
 local Resume = require("lib.Resume")
+local LoopSetup = require("lib/LoopSetup")
+local LoopFuel = require("lib/LoopFuel")
+
+-- Fuel state: assigned once at startup (or safe defaults on resume).
+local cfg = nil   -- LoopSetup answers (fuel chest side, lava, tags)
+local tripEst = 0 -- one-way fuel estimate: block count + travel margin
+local checkFuel   -- proactive fuel evac; defined below with the refill code
 local params = {
     length = 0,
     width = 0,
@@ -120,15 +127,11 @@ local function turnTo(targetFace)
 end
 
 local function forward()
+    checkFuel() -- proactive fuel evac; replaces the old OutOfFuel error
     while not turtle.forward() do
-        local fuel = turtle.getFuelLevel()
-        if fuel == 0 then
-            error("OutOfFuel", 0)
-        else
-            turtle.dig()
-            turtle.attack()
-            sleep(0.5)
-        end
+        turtle.dig()
+        turtle.attack()
+        sleep(0.5)
     end
     
     if state.facing == 0 then state.z = state.z + 1
@@ -225,6 +228,51 @@ local function selectFallingBlock()
     return false
 end
 
+--------------------------------------
+-- FUEL (LoopFuel integration)
+--------------------------------------
+local inEvac = false -- true during a fuel evac (no nested evacs)
+
+local function topUpFuel()
+    -- Fixed-point refuel at the start. If the point is dry, wait for fuel
+    -- items here (reachable); Q aborts and the program stops quietly.
+    if not LoopFuel.refuelAtStart(cfg, 2 * tripEst) then
+        if not LoopFuel.waitForFuel(cfg, 2 * tripEst) then
+            error("", 0)
+        end
+    end
+end
+
+checkFuel = function()
+    -- Proactive fuel evac: head home while the trip is still affordable.
+    if inEvac or not cfg then return end
+    local dist = math.abs(state.x) + math.abs(state.z)
+    if LoopFuel.needEvac(dist) then
+        inEvac = true
+        local rx, rz, rf = state.x, state.z, state.facing
+        log("Fuel evac at " .. rx .. "," .. rz)
+        state.isReturning = true
+        goTo(0, 0)
+        topUpFuel()
+        goTo(rx, rz)
+        turnTo(rf)
+        state.isReturning = false
+        inEvac = false
+    end
+end
+
+local function warnRestock()
+    -- Estimate: length * width blocks, one per column. This file has no
+    -- height param; columns fill until the falling blocks stop, so real
+    -- use is higher when the holes are deep. Over 960 blocks (15 stacks)
+    -- a mid-run restock will be needed via the return-to-start refill.
+    local need = state.params.length * state.params.width
+    if need > 960 then
+        colorPrint("WARNING: This job needs at least " .. need .. " blocks, over 960 (15 stacks).", colors.red)
+        colorPrint("A mid-run restock will be needed; the turtle returns to 0,0 for it.", colors.orange)
+    end
+end
+
 local function performRefillSequence()
     local returnX, returnZ = state.x, state.z
     local returnFacing = state.facing
@@ -232,7 +280,8 @@ local function performRefillSequence()
     log("Refill required at "..state.x..","..state.z)
     state.isReturning = true
     goTo(0,0)
-    
+    topUpFuel() -- fixed-point fuel refill while we are at the start
+
     while not selectFallingBlock() do
         turtle.suck()
         turtle.suckUp()
@@ -432,11 +481,24 @@ end
 
 -- MAIN EXECUTION
 if loadProgress() then
+    cfg = LoopSetup.defaults() -- resume: no questions; safe no-op fuel config
+    tripEst = state.params.length * state.params.width + 64
     createStartup()
     promptStart(true)
 else
     parseArgs()
     if params.length > 0 and params.width > 0 then
+        warnRestock()
+        -- Fuel setup: every question answered once, here.
+        cfg = LoopSetup.run({
+            blurb = "Filler: fills columns with falling blocks (sand, gravel, etc.). "
+                .. "Returns to 0,0 for material and fuel refills.",
+            fuel = true, fuelTags = true, lava = true, fuelChest = true, bucketSlot = 16,
+        })
+        if not cfg then return end -- user aborted; stop quietly
+        -- One-way fuel estimate: block count plus a small travel margin.
+        tripEst = state.params.length * state.params.width + 64
+        if not LoopFuel.ensure(cfg, tripEst) then return end -- aborted; quiet
         createStartup()
         promptStart(false)
         saveProgress()
@@ -453,10 +515,8 @@ while true do
             fullCleanup()
             colorPrint("\nTerminated by user.", colors.red)
             return
-        elseif err == "OutOfFuel" then
-            saveProgress()
-            colorPrint("\nOut of fuel. Refuel and re-run to resume.", colors.red)
-            return
+        elseif err == "" then
+            return -- quiet stop: user aborted a fuel or material wait
         else
             error(err)
         end

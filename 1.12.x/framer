@@ -1,4 +1,4 @@
-version = 20261013.0300
+version = 20261013.1200
 local allowedLib = require("lib.allowedBlocks")
 local allowedBlocks = allowedLib.allowedBlocks
 -- FRAME BUILDER v0.1
@@ -200,6 +200,37 @@ local function buildShell(size, placed, total)
 end
 
 --------------------------------------
+-- SESSION MATERIAL OFFER (plan item 8B)
+--------------------------------------
+local function offerSessionMaterials()
+    -- Offer the distinct block types already in inventory (slots 1-15;
+    -- 16 is the fuel/bucket slot) as this run's material list.
+    -- Session-only; nothing is stored.
+    local seen, names = {}, {}
+    for i = 1, 15 do
+        local d = turtle.getItemDetail(i)
+        if d and d.name and not d.name:lower():find("bucket", 1, true) then
+            local n = d.name:lower()
+            if not seen[n] then
+                seen[n] = true
+                names[#names + 1] = d.name
+            end
+        end
+    end
+    if #names == 0 then return end
+    colorPrint("Block types in inventory:", colors.orange)
+    for _, n in ipairs(names) do print("  " .. n) end
+    io.write("Use these block types as build material for this run? [Y/n] ")
+    local ans = (read() or ""):lower()
+    if ans == "" or ans == "y" or ans == "yes" then
+        local set = {}
+        for n in pairs(seen) do set[n] = true end
+        if allowedLib.setSession then allowedLib.setSession(set) end
+        colorPrint("Session material list set (" .. #names .. " types).", colors.green)
+    end
+end
+
+--------------------------------------
 -- MAIN
 --------------------------------------
 term.clear(); term.setCursorPos(1,1)
@@ -225,7 +256,9 @@ for i = 1, #tArgs, 2 do
 end
 local size = cliSize > 0 and cliSize or readNum("Enter cube size (N x N x N):")
 
--- block requirement estimate
+-- Block requirement estimate.
+-- frame: size layers * 4 edges * (size-1) blocks per edge (cube edges only)
+-- shell: size layers * 4 sides * size blocks per side (full hollow room)
 local required
 if mode=="frame" then
     required = 4 * size * (size - 1)
@@ -234,12 +267,22 @@ else
 end
 
 colorPrint("Minimum required blocks: "..required, colors.orange)
+if required > 960 then
+    -- Over 960 blocks (15 stacks) the turtle cannot carry it all, so a
+    -- mid-run restock will be needed.
+    colorPrint("WARNING: This job needs "..required.." blocks, over 960 (15 stacks).", colors.red)
+    colorPrint("A mid-run restock will be needed.", colors.orange)
+end
 colorPrint("Press ENTER when materials are loaded.", colors.green)
 read()
 
 -- Allow starting with 64 blocks (or required if <64)
 local minStart = math.min(64, required)
 waitForBlocks(minStart)
+
+-- Session material offer (plan item 8B), after materials are loaded and
+-- before any digging.
+offerSessionMaterials()
 
 -- countdown
 for i=5,1,-1 do

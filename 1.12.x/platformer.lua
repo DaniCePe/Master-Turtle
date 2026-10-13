@@ -1,4 +1,4 @@
-version = 20261013.0300
+version = 20261013.1200
 -- PLATFORMER v6.0
 -- Date: 2026-10-12
 -- Inspired by Cluster Scanner v4.1 Logic
@@ -27,6 +27,13 @@ local platform_backup = "startup_old_platformer"
 local allowedLib = require("lib/allowedBlocks")
 local allowedBlocks = allowedLib.allowedBlocks
 local Resume = require("lib.Resume")
+local LoopSetup = require("lib/LoopSetup")
+local LoopFuel = require("lib/LoopFuel")
+
+-- Fuel state: assigned once at startup (or safe defaults on resume).
+local cfg = nil   -- LoopSetup answers (fuel chest side, lava, tags)
+local tripEst = 0 -- one-way fuel estimate: block count + travel margin
+local checkFuel   -- proactive fuel evac; defined below with the refill code
 
 --------------------------------------
 -- CONFIGURATION & DEFAULTS
@@ -146,15 +153,11 @@ local function turnTo(targetFace)
 end
 
 local function forward()
+    checkFuel() -- proactive fuel evac; replaces the old OutOfFuel error
     while not turtle.forward() do
-        local fuel = turtle.getFuelLevel()
-        if fuel == 0 then
-            error("OutOfFuel", 0)
-        else
-            turtle.dig()
-            turtle.attack()
-            sleep(0.5)
-        end
+        turtle.dig()
+        turtle.attack()
+        sleep(0.5)
     end
     
     if state.facing == 0 then state.z = state.z + 1
@@ -166,6 +169,7 @@ local function forward()
 end
 
 local function up()
+    checkFuel()
     while not turtle.up() do
         turtle.digUp()
         sleep(0.5)
@@ -175,6 +179,7 @@ local function up()
 end
 
 local function down()
+    checkFuel()
     while not turtle.down() do
         turtle.digDown()
         sleep(0.5)
@@ -278,6 +283,79 @@ local function selectAllowedBlock()
     return false
 end
 
+--------------------------------------
+-- FUEL (LoopFuel integration)
+--------------------------------------
+local inEvac = false -- true during a fuel evac (no nested evacs)
+
+local function topUpFuel()
+    -- Fixed-point refuel at the start. If the point is dry, wait for fuel
+    -- items here (reachable); Q aborts and the program stops quietly.
+    if not LoopFuel.refuelAtStart(cfg, 2 * tripEst) then
+        if not LoopFuel.waitForFuel(cfg, 2 * tripEst) then
+            error("", 0)
+        end
+    end
+end
+
+checkFuel = function()
+    -- Proactive fuel evac: head home while the trip is still affordable.
+    -- goTo only moves x/z, so Y is preserved (matters for crops/roofs).
+    if inEvac or not cfg then return end
+    local dist = math.abs(state.x) + math.abs(state.z) + math.abs(state.y or 0)
+    if LoopFuel.needEvac(dist) then
+        inEvac = true
+        local rx, rz, rf = state.x, state.z, state.facing
+        log("Fuel evac at " .. rx .. "," .. rz)
+        state.isReturning = true
+        goTo(0, 0)
+        topUpFuel()
+        goTo(rx, rz)
+        turnTo(rf)
+        state.isReturning = false
+        inEvac = false
+    end
+end
+
+local function warnRestock()
+    -- Block estimate is mode-dependent (see totalCells). Over 960 blocks
+    -- (15 stacks) the turtle cannot carry it all, so a mid-run restock
+    -- will be needed via the return-to-start refill.
+    local need = totalCells()
+    if need > 960 then
+        colorPrint("WARNING: This job needs " .. need .. " blocks, over 960 (15 stacks).", colors.red)
+        colorPrint("A mid-run restock will be needed; the turtle returns to 0,0 for it.", colors.orange)
+    end
+end
+
+local function offerSessionMaterials()
+    -- Plan item 8B: offer the distinct block types already in inventory
+    -- (slots 1-15; 16 is the fuel/bucket slot) as this run's material
+    -- list. Session-only; nothing is stored.
+    local seen, names = {}, {}
+    for i = 1, 15 do
+        local d = turtle.getItemDetail(i)
+        if d and d.name and not d.name:lower():find("bucket", 1, true) then
+            local n = d.name:lower()
+            if not seen[n] then
+                seen[n] = true
+                names[#names + 1] = d.name
+            end
+        end
+    end
+    if #names == 0 then return end
+    colorPrint("Block types in inventory:", colors.orange)
+    for _, n in ipairs(names) do print("  " .. n) end
+    io.write("Use these block types as build material for this run? [Y/n] ")
+    local ans = (read() or ""):lower()
+    if ans == "" or ans == "y" or ans == "yes" then
+        local set = {}
+        for n in pairs(seen) do set[n] = true end
+        if allowedLib.setSession then allowedLib.setSession(set) end
+        colorPrint("Session material list set (" .. #names .. " types).", colors.green)
+    end
+end
+
 local function performRefillSequence()
     local returnX, returnZ = state.x, state.z
     local returnFacing = state.facing
@@ -285,7 +363,8 @@ local function performRefillSequence()
     log("Refill required at "..state.x..","..state.z)
     state.isReturning = true
     goTo(0,0)
-    
+    topUpFuel() -- fixed-point fuel refill while we are at the start
+
     -- Search for blocks loop
     while not selectAllowedBlock() do
         -- Try grabbing from chest (Front, Up, Down)
@@ -634,6 +713,8 @@ end
 
 -- MAIN EXECUTION
 if loadProgress() then
+    cfg = LoopSetup.defaults() -- resume: no questions; safe no-op fuel config
+    tripEst = totalCells() + 64
     createStartup()
     promptStart(true)
 else
@@ -641,8 +722,20 @@ else
     promptOptions()
     applyParamDefaults()
     if params.length > 0 and params.width > 0 then
+        warnRestock()
+        -- Fuel setup: every question answered once, here.
+        cfg = LoopSetup.run({
+            blurb = "Platformer: builds floor/walls/solid/hollow/roof shapes, placing down "
+                .. "(or up when inverted). Returns to 0,0 for material and fuel refills.",
+            fuel = true, fuelTags = true, lava = true, fuelChest = true, bucketSlot = 16,
+        })
+        if not cfg then return end -- user aborted; stop quietly
+        -- One-way fuel estimate: the block count plus a small travel margin.
+        tripEst = totalCells() + 64
+        if not LoopFuel.ensure(cfg, tripEst) then return end -- aborted; quiet
         createStartup()
         promptStart(false)
+        offerSessionMaterials() -- plan item 8B; after blocks are loaded, before any digging
         saveProgress() -- Save initial params
     else
         colorPrint("Invalid Dimensions.", colors.red)
@@ -657,10 +750,8 @@ while true do
             fullCleanup()
             colorPrint("\nTerminated by user.", colors.red)
             return
-        elseif err == "OutOfFuel" then
-            saveProgress()
-            colorPrint("\nOut of fuel. Refuel and re-run to resume.", colors.red)
-            return
+        elseif err == "" then
+            return -- quiet stop: user aborted a fuel or material wait
         else
             error(err)
         end
