@@ -1,4 +1,4 @@
-version = 20261012.1200
+version = 20261013.0100
 --[[
 	Last edited: see version YYYYMMDD.HHMM
 	Master Turtle pack installer/updater.
@@ -11,6 +11,7 @@ version = 20261012.1200
 local tmpDir = "tmp"	-- set temp folder name to 'tmp'
 local files = {}		-- table of files
 local fileSizes = {}	-- table of current file sizes
+local fast = false	-- fast mode: skip delays, quiet output
 
 function clear()
 	term.clear()
@@ -23,6 +24,19 @@ function log(text)
 	local h = fs.open("update.log", "a")
 	h.writeLine(text)
 	h.close()
+end
+
+function vlog(text)
+	-- Verbose: always to the log file, screen only when not fast
+	local h = fs.open("update.log", "a")
+	h.writeLine(text)
+	h.close()
+	if not fast then print(text) end
+end
+
+function dsleep(n)
+	-- Delay that fast mode skips
+	if not fast then sleep(n) end
 end
 
 function checkLabel()
@@ -61,7 +75,7 @@ end
 
 function checkFile(url, fileName, tmpDir)
 	if not fs.exists(fileName) then
-		log("Missing fileName "..fileName..", trying Github")
+		vlog("Missing fileName "..fileName..", trying Github")
 	end
 	local fileURL = url..fileName
 	-- eg "https://raw.githubusercontent.com/Inksaver/Computercraft-GUI/main/lib/ui/Multibutton.lua"
@@ -77,7 +91,7 @@ function checkFile(url, fileName, tmpDir)
 			-- Save new fileName
 			h.write(data)
 			h.close()
-			log(fileName.." saved from Github to ".. tempFile)
+			vlog(fileName.." saved from Github to ".. tempFile)
 			return true
 		end
 	end
@@ -91,10 +105,10 @@ end
 
 function moveFile(fileName, tmpDir) 			-- move tmp copy to correct position
 	fs.delete(fileName)
-	sleep(1)
+	dsleep(1)
 	local tempFile = getTempFileName(fileName)
 	fs.move(tempFile, fileName) 				--move to correct position
-	log("Moved: "..tempFile.." from "..tmpDir.." to ".. fileName)
+	vlog("Moved: "..tempFile.." from "..tmpDir.." to ".. fileName)
 end
 
 function getVersion(line, fileName)
@@ -133,10 +147,10 @@ function isNewer(fileName, tmpDir)
 			new = fs.open(tempFile, "r")
 			newOpen = true
 			local oldVer = getVersion(old.readLine(), fileName)	-- pass line 1 eg version = 20250915.1800
-			log("Existing "..fileName.." version: "..oldVer)
+			vlog("Existing "..fileName.." version: "..oldVer)
 			
 			local newVer = getVersion(new.readLine(), fileName)
-			log("Downloaded "..fileName.." version: "..newVer)
+			vlog("Downloaded "..fileName.." version: "..newVer)
 			if oldVer > 0 and newVer > 0 then					-- both have version numbers
 				if newVer > oldVer then
 					move = true
@@ -160,13 +174,13 @@ function process(url, fileName, tmpDir, fileSizes)
 	local count = 0
 	
 	local freeSpace = fs.getFreeSpace("./")
-	log("\nAvailable space: "..freeSpace)
-	log("Checking: "..fileName)
+	vlog("\nAvailable space: "..freeSpace)
+	vlog("Checking: "..fileName)
 
 	local fileSize = fileSizes[fileName]
 
-	log(fileName.." size:"..fileSize)
-	log("Available space after fetch: "..freeSpace - fileSize)
+	vlog(fileName.." size:"..fileSize)
+	vlog("Available space after fetch: "..freeSpace - fileSize)
 	if freeSpace - fileSize < 50000 then
 		clear()
 		local message = 
@@ -190,13 +204,16 @@ computer_space_limit = 2000000 or more
 				moveFile(fileName, tmpDir) 					-- move tmp copy to correct location
 				count = count  + 1
 			else
-				log(fileName.." is newer or unchanged")
+				vlog(fileName.." is newer or unchanged")
 			end
-			sleep(1)
+			if fast then
+				print(fileName..": "..(count > 0 and "updated" or "unchanged"))
+			end
+			dsleep(1)
 			local tempFile = getTempFileName(fileName)
-			log("Removing "..tempFile)
+			vlog("Removing "..tempFile)
 			fs.delete(tempFile)
-			sleep(2)
+			dsleep(2)
 		end
 	end
 	
@@ -206,10 +223,10 @@ end
 function addFileSize(fileSizes, fileName)
 	if fs.exists(fileName) then
 		fileSizes[fileName] = fs.getSize(fileName)
-		log("File size "..fileName..": "..fileSizes[fileName])
+		vlog("File size "..fileName..": "..fileSizes[fileName])
 	else
 		fileSizes[fileName] = 0
-		log("File size "..fileName.."\t: "..fileSizes[fileName].." (file not present)")
+		vlog("File size "..fileName.."\t: "..fileSizes[fileName].." (file not present)")
 	end
 	return fileSizes
 end
@@ -218,6 +235,9 @@ function main()
 	local doContinue = true							-- set continue flag						
 	clear()
 	checkLabel() 									-- make sure turtle label is set
+	io.write("Fast update (skip delays, quiet output)? [Y/n]: ")
+	local fans = (read() or ""):lower()
+	fast = (fans == "" or fans == "y" or fans == "yes")
 	createTempDir() 								-- create /tmp/
 	
 	-- required for both turtle and advanced turtle
@@ -246,7 +266,7 @@ function main()
     "cc-ai", "updater.lua",
     "lib/Resume.lua", "lib/allowedBlocks.lua",
     "lib/Class.lua", "lib/clsTurtle.lua", "lib/EntityMgr.lua",
-    "lib/Events.lua", "lib/help.lua", "lib/Log.lua", "lib/menu.lua",
+    "lib/Events.lua", "lib/help.lua", "lib/Log.lua", "lib/LoopFuel.lua", "lib/LoopSetup.lua", "lib/menu.lua",
     "lib/Project.lua", "lib/Scene.lua", "lib/SceneMgr.lua",
     "lib/TurtleUtils.lua", "lib/Vector2.lua",
     "lib/data/items.lua", "lib/data/taskInventory.lua",
@@ -264,13 +284,13 @@ function main()
 	h.writeLine('Update Log:')
 	h.close()
 	
-	log("Checking file sizes:\n")
+	vlog("Checking file sizes:\n")
 	for _, file in ipairs(fileList) do
 		fileSizes = addFileSize(fileSizes, file)
 	end	
 	
 	local freeSpace = fs.getFreeSpace("./")
-	log("Free space before update: "..freeSpace.."\n")
+	vlog("Free space before update: "..freeSpace.."\n")
 	clear()
 	
 	local url = "https://raw.githubusercontent.com/DaniCePe/Master-Turtle/main/1.20.x/"
@@ -279,11 +299,11 @@ function main()
 		-- download files from our Github repo to tmp/
 	end
 	
-	sleep(1)
+	dsleep(1)
 	log("Attempting deletion of ./"..tmpDir)
 	status, retval = pcall(fs.delete, tmpDir)
 	if status then
-		log("./"..tmpDir.." deleted")
+		vlog("./"..tmpDir.." deleted")
 	else
 		log("Directory delete error message:\n "..tostring(retVal))
 	end
