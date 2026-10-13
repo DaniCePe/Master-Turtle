@@ -1,3 +1,4 @@
+version = 20261013.0300
 -- Metadata and Constants
 local authorName = "Rare Corp."
 local logoArt = [[
@@ -215,7 +216,6 @@ local function printToBoth(message, color, appendToLast)
         table.insert(conversationBuffer, {{message = message, color = color}})
     end
     redrawMonitor()
-    printCharToMonitor("\n", x, y)
 end
 
 -- Print the welcome message

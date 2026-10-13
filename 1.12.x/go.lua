@@ -1,4 +1,4 @@
-version = 20251004.2000
+version = 20261013.0300
 --[[
 	Will auto-download clsTurtle.lua
 	Used to move turtle in multiple directions
@@ -107,7 +107,7 @@ function getCommand()
 						term.setCursorPos(1, row)
 						term.write("0 to 6 or enter? "..cmd.."_")
 					else
-						if key + offset - 1 <= 6 then -- allow 0 to 6 only
+						if tonumber(cmd:sub(2)..num) <= 6 then -- allow 0 to 6 only
 							cmd = cmd..num
 							break
 						end
@@ -203,6 +203,7 @@ function main()
 			cmd = string.upper(getCommand())
 			action = string.sub(cmd, 1, 1)
 			modifier = string.sub(cmd, 2)
+			if modifier == "" then modifier = "1" end
 			if cmd == "" then
 				break
 			else
@@ -213,7 +214,7 @@ function main()
 				elseif action == "P" then --place
 					--place current selected slot contents
 					--T:place(blockType, damageNo, direction, leaveExisting)
-					local slotContains, slotCount, slotDamage = T:getSlotContains(turtle.getSelectedSlot)
+					local slotContains, slotCount, slotDamage = T:getSlotContains(turtle.getSelectedSlot())
 					
 					print("Place "..slotContains.." count: "..slotCount.." damage: "..tostring(slotDamage).." Enter")
 					read()

@@ -1,3 +1,4 @@
+version = 20261013.0300
 -- PLATFORMER v6.0
 -- Date: 2026-10-12
 -- Inspired by Cluster Scanner v4.1 Logic
@@ -16,11 +17,10 @@
 --   - Safety: Instant Q to Terminate, Startup/Cleanup management.
 --   - Refill: Smart auto-refill logic (returns to start -> sleep -> resume).
 
-local VERSION = "5.0"
+local VERSION = "6.1"
 local RESTORE_FILE = ".platformer_restore"
 local LOG_FILE = "platformer_log.txt"
 local LOG_DIR = "Platformer_Logs"
-local platform_startup = "startup"
 local platform_backup = "startup_old_platformer"
 
 -- Load Allowed Blocks library
@@ -149,8 +149,7 @@ local function forward()
     while not turtle.forward() do
         local fuel = turtle.getFuelLevel()
         if fuel == 0 then
-            colorPrint("OUT OF FUEL", colors.red)
-            sleep(1)
+            error("OutOfFuel", 0)
         else
             turtle.dig()
             turtle.attack()
@@ -294,8 +293,6 @@ local function performRefillSequence()
         turtle.suckUp()
         turtle.suckDown()
         
-        if selectAllowedBlock() then break end
-        
         term.clear()
         term.setCursorPos(1,1)
         colorPrint("=== WAITING FOR BLOCKS ===", colors.red)
@@ -310,7 +307,6 @@ local function performRefillSequence()
     
     log("Refill successful. Returning to work.")
     colorPrint("Resuming...", colors.green)
-    state.isReturning = true -- Still technically returning
     goTo(returnX, returnZ)
     turnTo(returnFacing)
     state.isReturning = false
@@ -428,7 +424,7 @@ local function buildRoof()
     log("Starting roof build, height-up=" .. state.params.height ..
         (state.params.inverted and " (inverted, from below)" or ""))
     if not state.params.inverted then
-        while state.y < state.params.height do up() end
+        while state.y < state.params.height and not state.descending do up() end
     end
     if state.layer <= 1 then
         if not state.layerStarted then
@@ -444,8 +440,12 @@ local function buildRoof()
     if not state.params.inverted and state.params.height > 0 then
         -- Step off the roof footprint before descending; the column we
         -- ascended through is now roofed over.
+        state.descending = true
+        saveProgress()
         goTo(state.params.width, 0)
         while state.y > 0 do down() end
+        state.descending = false
+        saveProgress()
         goTo(0, 0)
     end
 end
@@ -621,7 +621,7 @@ local function promptStart(resume)
         if have < 64 and not params.debug then
              colorPrint("WARNING: Low block count ("..have..")", colors.red)
              colorPrint("Press ENTER to Start Anyway or Ctrl+T to cancel", colors.orange)
-             read()
+             if read() == nil then return end
         else
              print("Press ENTER to Start")
              read()
@@ -656,6 +656,10 @@ while true do
         if err == "Terminated" then
             fullCleanup()
             colorPrint("\nTerminated by user.", colors.red)
+            return
+        elseif err == "OutOfFuel" then
+            saveProgress()
+            colorPrint("\nOut of fuel. Refuel and re-run to resume.", colors.red)
             return
         else
             error(err)

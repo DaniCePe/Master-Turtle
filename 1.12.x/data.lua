@@ -1,4 +1,4 @@
-version = 20250916.0800
+version = 20261013.0300
 
 local usage = [[usage:
 data    block name forward or data 1
@@ -67,12 +67,12 @@ local function getData(inspect)
 		lines = checkLines(lines)
 		
 		if data.name:find("water") ~= nil then -- allows for bubble_column
-			if data.state.level ~= nil then
+			if data.state and data.state.level ~= nil then
 				if data.state.level == 0 then
 					isSource = true
 				end
+				term.write("data.state.level = "..data.state.level)
 			end
-			term.write("data.state.level = "..data.state.level)
 			if isSource then
 				term.write(" (source)\n")
 			else

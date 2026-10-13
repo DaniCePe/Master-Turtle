@@ -1,4 +1,4 @@
-version = 20261012.1200
+version = 20261013.0300
 -- Unified movement program for the b/d/f/u shims.
 -- Shims call: shell.run("move", "<direction>", ...)
 -- direction is "backwards", "down", "forwards" or "up".
@@ -81,26 +81,22 @@ local above, below = false, false
 function doMoves(numBlocksRequested, doDig, direction)
 	local errorMsg = nil
 	local numBlocksMoved = 0
-	local Move, Dig, Detect
+	local Move, Dig
 	local turned = false
 	
 	-- re-assign turtle functions to new variables
 	if direction == "forwards" then
 		Move = turtle.forward
 		Dig = turtle.dig
-		Detect = turtle.detect
 	elseif direction == "backwards" then
 		Move = turtle.back
 		Dig = turtle.dig
-		Detect = turtle.detect
 	elseif direction == "up" then
 		Move = turtle.up
 		Dig = turtle.digUp
-		Detect = turtle.detectUp
 	else
 		Move = turtle.down
 		Dig = turtle.digDown
-		Detect = turtle.detectDown
 	end
 	
 	for i = 1, numBlocksRequested, 1 do

@@ -1,4 +1,4 @@
-version = 20250915.1500
+version = 20261013.0300
 --[[
 	Last edited: see version YYYYMMDD.HHMM
 	Will auto-download clsTurtle.lua
@@ -89,7 +89,7 @@ end
 	
 function goHome(x, y)
 	if y > 0 then
-		utils.goBack(y)
+		T:back(y)
 	elseif y < 0 then
 		T:forward(math.abs(y))
 	end

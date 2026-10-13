@@ -1,3 +1,4 @@
+version = 20261013.0300
 -- FILLER v1.0
 -- Date: 2025-12-17
 -- Adapted from Platformer v5.0
@@ -6,7 +7,6 @@
 local VERSION = "1.0"
 local RESTORE_FILE = ".filler_restore"
 local LOG_FILE = "filler_log.txt"
-local filler_startup = "startup"
 local filler_backup = "startup_old_filler"
 
 -- Embedded table of falling blocks
@@ -123,8 +123,7 @@ local function forward()
     while not turtle.forward() do
         local fuel = turtle.getFuelLevel()
         if fuel == 0 then
-            colorPrint("OUT OF FUEL", colors.red)
-            sleep(1)
+            error("OutOfFuel", 0)
         else
             turtle.dig()
             turtle.attack()
@@ -238,8 +237,6 @@ local function performRefillSequence()
         turtle.suck()
         turtle.suckUp()
         turtle.suckDown()
-        
-        if selectFallingBlock() then break end
         
         term.clear()
         term.setCursorPos(1,1)
@@ -380,7 +377,7 @@ local function parseArgs()
 end
 
 local function promptStart(resume)
-    local timer = os.startTimer(resume and 5 or 0) -- Auto-start after 5s if resume
+    local timer = resume and os.startTimer(5) or nil -- Auto-start after 5s if resume
     
     while true do
         term.clear()
@@ -455,6 +452,10 @@ while true do
         if err == "Terminated" then
             fullCleanup()
             colorPrint("\nTerminated by user.", colors.red)
+            return
+        elseif err == "OutOfFuel" then
+            saveProgress()
+            colorPrint("\nOut of fuel. Refuel and re-run to resume.", colors.red)
             return
         else
             error(err)

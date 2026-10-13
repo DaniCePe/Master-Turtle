@@ -1,4 +1,4 @@
-version = 20261013.0100
+version = 20261013.0300
 local allowedLib = require("lib.allowedBlocks")
 local allowedBlocks = allowedLib.allowedBlocks
 -- TRMP.lua v0.4 BETA
@@ -6,7 +6,7 @@ local allowedBlocks = allowedLib.allowedBlocks
 -- TRMP.lua v0.3 BETA
 	-- Added MAX_CARRY safety check.
 	-- Fixed color scheme
--- TRMP.lua v0.2 BETA
+-- TRMP.lua v0.4 BETA
 	-- Layered snake-pattern wall construction
 	-- Uses allowedBlocks() library
 -- TRMP.lua v0.1 BETA
@@ -111,6 +111,7 @@ end
 --------------------------------------
 local function forwardSafe()
     while not turtle.forward() do
+        if turtle.getFuelLevel() == 0 then error("Out of fuel", 0) end
         turtle.dig()
         turtle.attack()
         sleep(0.1)
@@ -119,14 +120,8 @@ end
 
 local function upSafe()
     while not turtle.up() do
+        if turtle.getFuelLevel() == 0 then error("Out of fuel", 0) end
         turtle.digUp()
-        sleep(0.1)
-    end
-end
-
-local function downSafe()
-    while not turtle.down() do
-        turtle.digDown()
         sleep(0.1)
     end
 end
@@ -140,7 +135,7 @@ local function turnLeft() turtle.turnLeft() end
 local function drawUI(placed, total)
     term.clear()
     term.setCursorPos(1,1)
-    colorPrint("=== TRMP Wall Builder v0.2 BETA ===", colors.blue)
+    colorPrint("=== TRMP Wall Builder v0.4 ===", colors.blue)
     print(string.rep("=",30))
 
     colorWrite("Blocks placed: ", colors.green)
@@ -173,7 +168,7 @@ end
 --------------------------------------
 term.clear()
 term.setCursorPos(1,1)
-colorPrint("=== TRMP Wall Builder v0.2 BETA ===", colors.blue)
+colorPrint("=== TRMP Wall Builder v0.4 ===", colors.blue)
 
 local tArgs = { ... }
 local cliL, cliH, cliD = 0, 0, 0

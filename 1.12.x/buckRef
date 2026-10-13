@@ -1,4 +1,4 @@
-version = 20261012.1200
+version = 20261013.0300
 -- Universal Liquid Refuel
 -- Version 2.2 
 -- UI upgraded
@@ -41,13 +41,18 @@ local function drawUI(currentFuel, targetFuel)
     print("==============================")
 end
 
+-- Slots holding non-burnable filled buckets; skip them in the search
+local ignoredSlots = {}
+
 -- Main loop
 while turtle.getFuelLevel() < targetFuel do
     local didRefuel = false
     drawUI(turtle.getFuelLevel(), targetFuel)
 
     -- 1. Use any burnable filled bucket
-    local fullBucket = findItemBy(isFilledBucket)
+    local fullBucket = findItemBy(function(item, slot)
+        return isFilledBucket(item) and not ignoredSlots[slot]
+    end)
     if fullBucket then
         turtle.select(fullBucket)
         if turtle.refuel(0) then  -- check if burnable
@@ -56,6 +61,7 @@ while turtle.getFuelLevel() < targetFuel do
             didRefuel = true
         else
             print("Found non-burnable bucket in slot "..fullBucket..". Ignoring.")
+            ignoredSlots[fullBucket] = true
         end
     end
 
@@ -74,7 +80,8 @@ while turtle.getFuelLevel() < targetFuel do
                 print("No source block below to collect from. Waiting...")
             end
         else
-            print("No empty buckets available!")
+            print("No empty buckets and no burnable filled buckets left. Stopping.")
+            return
         end
     end
 

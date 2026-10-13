@@ -1,4 +1,4 @@
-version = 20261013.0100
+version = 20261013.0300
 local allowedLib = require("lib.allowedBlocks")
 local allowedBlocks = allowedLib.allowedBlocks
 -- FRAME BUILDER v0.1
@@ -102,14 +102,17 @@ end
 
 local function placeDownSmart()
     local ok,data = turtle.inspectDown()
-    if ok and not isAllowed(data.name) then turtle.digDown() end
+    if ok then
+        if isAllowed(data.name) then return true end
+        turtle.digDown()
+    end
 
     while not selectAllowed() do
         colorPrint("OUT OF ALLOWED BLOCKS! Add more & press ENTER.", colors.red)
         read()
     end
 
-    turtle.placeDown()
+    return turtle.placeDown()
 end
 
 --------------------------------------
@@ -138,7 +141,7 @@ end
 --------------------------------------
 local function drawUI(placed,total)
     term.clear(); term.setCursorPos(1,1)
-    colorPrint("=== HOLLOW CUBE BUILDER v1.0 ===", colors.blue)
+    colorPrint("=== FRAME BUILDER v0.1 ===", colors.blue)
     print(string.rep("=",30))
 
     colorWrite("Blocks placed: ", colors.green)
@@ -167,7 +170,8 @@ local function buildFrame(size, placed, total)
         -- 4 edges around
         for i=1,4 do
             for s=1,size-1 do
-                placeDownSmart(); placed=placed+1; drawUI(placed,total)
+                if placeDownSmart() then placed=placed+1 end
+                drawUI(placed,total)
                 if s < size-1 then forwardSafe() end
             end
             turtle.turnRight()
@@ -184,7 +188,8 @@ local function buildShell(size, placed, total)
     for h=1,size do
         for side=1,4 do
             for s=1,size do
-                placeDownSmart(); placed=placed+1; drawUI(placed,total)
+                if placeDownSmart() then placed=placed+1 end
+                drawUI(placed,total)
                 if s < size then forwardSafe() end
             end
             turtle.turnRight()
@@ -198,7 +203,7 @@ end
 -- MAIN
 --------------------------------------
 term.clear(); term.setCursorPos(1,1)
-colorPrint("=== HOLLOW CUBE BUILDER v1.0 ===", colors.blue)
+colorPrint("=== FRAME BUILDER v0.1 ===", colors.blue)
 
 -- Mode selection
 colorPrint("Choose mode:", colors.orange)
@@ -207,7 +212,7 @@ colorPrint("B) FRAME (edges only)", colors.green)
 
 local mode
 while true do
-    local m = string.lower(read())
+    local m = string.lower(read() or "")
     if m == "a" then mode="shell" break end
     if m == "b" then mode="frame" break end
     colorPrint("Enter A or B", colors.red)
@@ -223,9 +228,9 @@ local size = cliSize > 0 and cliSize or readNum("Enter cube size (N x N x N):")
 -- block requirement estimate
 local required
 if mode=="frame" then
-    required = (size * 4) * size
+    required = 4 * size * (size - 1)
 else
-    required = (size * size * 4) * size
+    required = 4 * size * size
 end
 
 colorPrint("Minimum required blocks: "..required, colors.orange)
