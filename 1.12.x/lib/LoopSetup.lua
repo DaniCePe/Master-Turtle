@@ -1,4 +1,4 @@
-version = 20261013.0300
+version = 20261013.1200
 -- lib/LoopSetup.lua: shared starter prompt for run-until-stopped programs.
 -- Autonomy rule: every question is answered ONCE here. Mid-run, the
 -- turtle never waits for input.
@@ -12,6 +12,7 @@ version = 20261013.0300
 --     noFront = true,    -- exclude front from side choices
 --     fuel = true,       -- ask: burn tagged fuel found while working?
 --     fuelTags = true,   -- ask: which item IDs are OK to burn
+--     fuelChest = true,   -- ask: fuel chest side at the start (for refills)
 --     lava = true,       -- ask lava source: side at start / under while traveling
 --     bucketSlot = 16,   -- designated fuel/bucket slot
 --   })
@@ -166,6 +167,14 @@ function LoopSetup.run(opts)
         cfg.lavaUnder = false
     end
 
+    if opts.fuelChest then
+        local side = askSide("Fuel chest side at the start position (for refills):", {})
+        if not side then return nil end
+        cfg.fuelChestSide = side
+    else
+        cfg.fuelChestSide = "none"
+    end
+
     return cfg
 end
 
@@ -176,6 +185,7 @@ function LoopSetup.defaults()
         trashSide = "none", trashTags = {},
         dumpSide = "none",
         burnFuel = false, fuelTags = {},
+        fuelChestSide = "none",
         lavaSide = "none", lavaUnder = false,
     }
 end
