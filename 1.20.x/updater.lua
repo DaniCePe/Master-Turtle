@@ -1,4 +1,4 @@
-version = 20261013.0300
+version = 20261013.1200
 --[[
 	Last edited: see version YYYYMMDD.HHMM
 	Master Turtle pack installer/updater.
@@ -10,6 +10,7 @@ version = 20261013.0300
 
 local tmpDir = "tmp"	-- set temp folder name to 'tmp'
 local fileSizes = {}	-- table of current file sizes
+local failed = {}	-- files that failed to download, {name, reason} pairs
 local fast = false	-- fast mode: skip delays, quiet output
 
 function clear()
@@ -81,10 +82,12 @@ function checkFile(url, fileName, tmpDir)
 	local response, message = http.get(fileURL)
 	if response == nil then
 		log("failed to get "..fileName.." from Github")
+		failed[#failed + 1] = {fileName, tostring(message or "http error")}
 	else
 		local data = response.readAll()
 		if not data or data == "" then
 			log("empty download "..fileName)
+			failed[#failed + 1] = {fileName, "empty"}
 			response.close()
 			return false
 		end
@@ -97,6 +100,7 @@ function checkFile(url, fileName, tmpDir)
 			h.close()
 			if loadfile(tempFile) == nil then
 				log("Downloaded "..fileName.." failed syntax check, discarding")
+				failed[#failed + 1] = {fileName, "corrupt"}
 				fs.delete(tempFile)
 				return false
 			end
@@ -279,7 +283,7 @@ function main()
     "attack", "buckRef", "framer", "trump", "vacuum", "quarry",
     "chopchop.lua", "cluster.lua", "cobble.lua", "cranker.lua", "cropper.lua",
     "filler.lua", "go.lua", "lavaRefuel.lua", "platformer.lua",
-    "cc-ai", "updater.lua",
+    "cc-ai", "blockman", "updater.lua",
     "lib/Resume.lua", "lib/allowedBlocks.lua",
     "lib/Class.lua", "lib/clsTurtle.lua", "lib/EntityMgr.lua",
     "lib/Events.lua", "lib/help.lua", "lib/Log.lua", "lib/LoopFuel.lua", "lib/LoopSetup.lua", "lib/menu.lua",
@@ -326,6 +330,22 @@ function main()
 		log("Directory delete error message:\n "..tostring(retval))
 	end
 	clear()
+	if #failed > 0 then
+		log("Some files failed to download:")
+		for _, f in ipairs(failed) do
+			log("  "..f[1].." ("..f[2]..")")
+		end
+		log("")
+		log("Likely causes: the turtle ran out of disk space (the most common")
+		log("cause), or a network interruption. To raise the disk limit, save")
+		log("and close the game, then edit")
+		log(".minecraft/config/computercraft-server.toml, find the")
+		log("computer_space_limit line and add a zero or two to the number,")
+		log("then restart the game.")
+		log("")
+		log("Free up space or raise the limit, check the connection, then rerun updater.")
+		log("")
+	end
 	log("\nOperation Complete ")
 	log(updated.." files updated")
 
