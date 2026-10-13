@@ -1,15 +1,15 @@
-version = 20261013.0300
+version = 20261013.1200
 -- VACUUM SWEEPER v1.1
 -- Snake sweeps L x W, sucks floor items, dumps into chests below.
--- Checks below for a chest on every cell; refuels from tagged fuel
--- or a lava bucket (slot 16) instead of digging forever at 0 fuel.
+-- Checks below for a chest on every cell; evacuates to the fuel chest
+-- at the start (SmartFuel) instead of digging forever at 0 fuel.
 -- Uses full tracked path + reverse replay (from AE2 Scanner v3.1)
 -- Returns to start & facing after each sweep. Runs until Q or Ctrl+T.
 
 local LoopSetup = require("lib.LoopSetup")
 local LoopFuel = require("lib.LoopFuel")
 local cfg = LoopSetup.defaults()
-local minFuel = 0
+local tripEst = 0
 
 --------------------------------------
 -- UTIL / UI
@@ -46,21 +46,30 @@ end
 
 local function forwardSafe()
     while not turtle.forward() do
-        if turtle.getFuelLevel() == 0 then
-            -- Out of fuel: burn tagged fuel or use the bucket. If that
-            -- fails too, stop instead of retrying forever at 0 fuel.
-            if not LoopFuel.ensure(cfg, minFuel) then
-                error("OutOfFuel", 0)
-            end
-        else
-            turtle.dig()
-            turtle.attack()
-        end
+        turtle.dig()
+        turtle.attack()
         sleep(0.05)
     end
 end
 
+-- Mid-sweep evac: retrace to the start while the trip is affordable,
+-- refuel at the fixed point, then restart the sweep cycle from the top
+-- (the main loop already repeats; RefuelRestart unwinds to it).
+local function evacuateRefuel()
+    retracePath()
+    if not LoopFuel.refuelAtStart(cfg, 2 * tripEst) then
+        -- Fixed point dry: wait at the start (reachable) for fuel items.
+        if not LoopFuel.waitForFuel(cfg, 2 * tripEst) then
+            error("", 0) -- user aborted with Q
+        end
+    end
+    error("RefuelRestart", 0)
+end
+
 local function forwardTracked()
+    if LoopFuel.needEvac(math.abs(x) + math.abs(z)) then
+        evacuateRefuel()
+    end
     forwardSafe()
     if dir == 0 then z = z - 1; table.insert(path, {0,-1})
     elseif dir == 1 then x = x + 1; table.insert(path, {1,0})
@@ -173,6 +182,7 @@ local scfg = LoopSetup.run({
     blurb = "Sucks up floor items in an LxW snake sweep, dumps into chests found below, returns to start each cycle.",
     fuel = true,
     fuelTags = true,
+    fuelChest = true,
     lava = true,
     bucketSlot = 16,
 })
@@ -181,14 +191,15 @@ if not scfg then
     return
 end
 cfg = scfg
--- Enough fuel for a full sweep plus the trip home, capped at the limit.
-minFuel = LoopFuel.capEst(2 * L * W + 10)
+-- One-way move estimate for a full sweep plus the trip home; ensure()
+-- doubles it internally and caps at the fuel limit.
+tripEst = L * W + 10
 
 colorPrint("Press ENTER to start. Press Q (or Ctrl+T) to stop.", colors.green)
 read()
 
-if not LoopFuel.ensure(cfg, minFuel) then
-    print("Not enough fuel to start.")
+if not LoopFuel.ensure(cfg, tripEst) then
+    print("Fuel wait aborted.")
     return
 end
 
@@ -208,19 +219,22 @@ local function run()
             path = {}
             x, z = 0,0
             dir = startDir
-            sweep(L, W)
-            returnHome(startDir)
-            -- Back at start facing the start direction: refill the bucket
-            -- from the stated lava side when possible.
-            LoopFuel.fillAtStart(cfg)
+            local cycleOk, cycleErr = pcall(function()
+                sweep(L, W)
+                returnHome(startDir)
+                -- Back at start facing the start direction: refill the
+                -- bucket from the stated lava side when possible.
+                LoopFuel.fillAtStart(cfg)
+            end)
+            -- RefuelRestart: evacuated home and refueled mid-sweep; fall
+            -- through and restart the sweep cycle from the top.
+            if not cycleOk and cycleErr ~= "RefuelRestart" then
+                error(cycleErr, 0)
+            end
         end
     end)
     if not ok then
-        if err == "OutOfFuel" then
-            print("Out of fuel. Stopping.")
-        else
-            error(err, 0)
-        end
+        error(err, 0) -- quiet quit for abort; terminate propagates as usual
     end
 end
 

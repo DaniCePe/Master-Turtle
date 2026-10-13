@@ -1,12 +1,12 @@
-version = 20261013.0300
+version = 20261013.1200
 -- AE2 QUARTZ CLUSTER SCANNER v4.3 (Quarry Edition)
 -- Date: 2026-10-13
 -- Inspired by Civilwargeeky's Quarry
 -- v4.3 Changes:
 --   - Starter prompt (lib/LoopSetup): fuel questions answered once.
---   - Refuel: burns tagged fuel found while working, or a lava bucket
---     in slot 16 (lava side at start, or lava below while traveling),
---     instead of spinning forever at 0 fuel.
+--   - Refuel: SmartFuel startup plus a fixed refuel point (fuel chest
+--     side at start); evacuates home while the trip is affordable,
+--     refuels, and resumes the saved position.
 --   - Dump excludes the fuel/bucket slot; found fuel is staged there.
 -- v4.2 Changes:
 --   - Graceful stop: single Q press or Ctrl+T stops the scan and SAVES
@@ -38,7 +38,10 @@ local Resume = require("lib.Resume")
 local LoopSetup = require("lib.LoopSetup")
 local LoopFuel = require("lib.LoopFuel")
 local cfg = LoopSetup.defaults()
-local minFuel = 0
+local tripEst = 0
+-- Suppresses the per-step needEvac check during the evac movement
+-- itself (the turtle is already on its way home by then).
+local evacuating = false
 local params = {
     length = 0,
     width = 0,
@@ -207,20 +210,26 @@ local function turnTo(targetFace)
 end
 
 local function forward()
-    while not turtle.forward() do
-        -- Blocked? Dig? Attack? Refuel?
-        if turtle.getFuelLevel() == 0 then
-            -- Out of fuel: burn tagged fuel or use the bucket. If that
-            -- fails too, stop (progress is saved by the error handler).
-            if not LoopFuel.ensure(cfg, minFuel) then
-                log("Out of fuel at "..state.x..","..state.z)
-                colorPrint("OUT OF FUEL", colors.red)
-                error("Terminated", 0)
+    -- Once per step: if the trip home is barely affordable, go now.
+    if not evacuating and LoopFuel.needEvac(math.abs(state.x) + math.abs(state.z)) then
+        evacuating = true
+        local rx, rz = state.x, state.z
+        goTo(0, 0)
+        turnTo(0) -- face the start direction for the stated chest/lava sides
+        if not LoopFuel.refuelAtStart(cfg, 2 * tripEst) then
+            -- Fixed point dry: wait at the start (reachable) for fuel items.
+            if not LoopFuel.waitForFuel(cfg, 2 * tripEst) then
+                saveProgress()
+                error("", 0) -- user aborted with Q; progress is saved
             end
-        else
-            turtle.dig()
-            turtle.attack()
         end
+        goTo(rx, rz) -- resume where we left off
+        evacuating = false
+    end
+    while not turtle.forward() do
+        -- Blocked? Dig it or kill it.
+        turtle.dig()
+        turtle.attack()
     end
     
     if state.facing == 0 then state.z = state.z + 1
@@ -457,6 +466,7 @@ if state.x == 0 and state.z == 0 and state.cycleCount == 0 then
         blurb = "Scans the field below for AE2 quartz clusters, digs them, dumps into chests found below.",
         fuel = true,
         fuelTags = true,
+        fuelChest = true,
         lava = true,
         bucketSlot = 16,
     })
@@ -472,11 +482,12 @@ if state.x == 0 and state.z == 0 and state.cycleCount == 0 then
     promptStart(false)
 end
 
--- Enough fuel for a full cycle plus the trip home, capped at the limit.
-minFuel = LoopFuel.capEst(2 * state.params.length * state.params.width + 10)
+-- One-way move estimate for a full cycle plus the trip home; ensure()
+-- doubles it internally and caps at the fuel limit.
+tripEst = state.params.length * state.params.width + 10
 
-if not LoopFuel.ensure(cfg, minFuel) then
-    print("Not enough fuel to start.")
+if not LoopFuel.ensure(cfg, tripEst) then
+    print("Fuel wait aborted.")
     return
 end
 
